@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.stereotype.Service;
 
 import it.pasqualecavallo.s3sync.listener.WatchListeners;
 import it.pasqualecavallo.s3sync.model.AttachedClient;
@@ -14,6 +15,7 @@ import it.pasqualecavallo.s3sync.model.AttachedClient.SyncFolder;
 import it.pasqualecavallo.s3sync.utils.UserSpecificPropertiesManager;
 import software.amazon.awssdk.services.sqs.SqsClient;
 
+@Service
 public class ManageFolderService {
 
 	@Autowired

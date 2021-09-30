@@ -1,15 +1,14 @@
 package it.pasqualecavallo.s3sync.controller;
 
+import javax.validation.Valid;
+
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.mongodb.core.query.Criteria;
-import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-import it.pasqualecavallo.s3sync.model.AttachedClient;
+import it.pasqualecavallo.s3sync.controller.dto.AddFolderRequest;
 import it.pasqualecavallo.s3sync.service.ManageFolderService;
-import it.pasqualecavallo.s3sync.utils.UserSpecificPropertiesManager;
 
 @RestController
 public class ManageFolderController {
@@ -17,9 +16,9 @@ public class ManageFolderController {
 	@Autowired
 	private ManageFolderService manageFolderService;
 	
-	@PostMapping("/api/folder/add")
-	public void addFolder(@RequestBody AddFolderRequest addFolderRequest) {
-		
+	@PostMapping(value = "/api/folder/add")
+	public void addFolder(@RequestBody @Valid AddFolderRequest addFolderRequest) {
+		manageFolderService.addFolder(addFolderRequest.getLocalFolder(), addFolderRequest.getRemoteFolder());
 	}
 	
 }

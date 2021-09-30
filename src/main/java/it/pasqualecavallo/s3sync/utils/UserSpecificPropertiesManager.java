@@ -34,9 +34,4 @@ public class UserSpecificPropertiesManager {
 		return (String) UserSpecificPropertiesManager.properties.get(key);
 	}
 
-	public static void setProperty(String key, String value) {
-		UserSpecificPropertiesManager.properties.put(key, value);
-		// TODO: update file
-	}
-
 }
