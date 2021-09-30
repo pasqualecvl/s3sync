@@ -1,25 +1,23 @@
 package it.pasqualecavallo.s3sync.utils;
 
+import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.Properties;
 
 public class GlobalPropertiesManager {
 
 	private static Properties properties = new Properties();
-	
-	public GlobalPropertiesManager() throws IOException {
-		InputStream inputStream = getClass().getClassLoader().getResourceAsStream("/etc/s3sync.conf");
+
+	static {
 		try {
+			FileInputStream inputStream = new FileInputStream("/etc/s3sync.conf");
 			GlobalPropertiesManager.properties.load(inputStream);
-		} catch (NullPointerException | IOException e) {
-			throw new IOException("Property file '/etc/s3sync.conf' not found or not well formed");
+		} catch (IOException e) {
+			System.out.println("Error reading property files");
 		}
 	}
-	
-	
+
 	public static String getProperty(String key) {
 		return (String) GlobalPropertiesManager.properties.get(key);
 	}
 }
-

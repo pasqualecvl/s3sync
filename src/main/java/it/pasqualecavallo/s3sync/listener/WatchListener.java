@@ -9,12 +9,18 @@ import java.nio.file.WatchEvent;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 
+import org.springframework.scheduling.annotation.Scheduled;
+
+import software.amazon.awssdk.services.sqs.SqsClient;
+
 public class WatchListener implements Runnable {
 
 	private String rootLocation;
+	private SqsClient sqsClient;
 	
-	public WatchListener(String rootLocation) {
+	public WatchListener(String rootLocation, SqsClient sqsClient) {
 		this.rootLocation = rootLocation;
+		this.sqsClient = sqsClient;
 	}
 	
 	@Override
@@ -34,15 +40,15 @@ public class WatchListener implements Runnable {
 						managingEvent(event);
 					}
 				}
-			} 	
+			}
+			
 		} catch (IOException | InterruptedException e) {
 			throw new RuntimeException("Cannot start listening thread", e);
 		}
 	}
 
 	private void managingEvent(WatchEvent<?> event) {
-		// TODO Auto-generated method stub
-		
+		System.out.println(event.toString());
 	}
     
 }

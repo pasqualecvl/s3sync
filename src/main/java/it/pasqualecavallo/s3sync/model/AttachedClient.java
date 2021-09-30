@@ -1,5 +1,6 @@
 package it.pasqualecavallo.s3sync.model;
 
+import java.math.BigInteger;
 import java.util.List;
 
 import org.springframework.data.annotation.Id;
@@ -9,7 +10,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 public class AttachedClient {
 
 	@Id
-	private Integer id;
+	private BigInteger _id;
 
 	private String alias;
 
@@ -19,18 +20,19 @@ public class AttachedClient {
 		return alias;
 	}
 
-	public Integer getId() {
-		return id;
-	}
 
+	public BigInteger get_id() {
+		return _id;
+	}
+	
 	public void setAlias(String alias) {
 		this.alias = alias;
 	}
 
-	public void setId(Integer id) {
-		this.id = id;
+	public void set_id(BigInteger _id) {
+		this._id = _id;
 	}
-
+	
 	public List<SyncFolder> getSyncFolder() {
 		return syncFolder;
 	}
