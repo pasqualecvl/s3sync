@@ -35,30 +35,29 @@ public class WatchListener implements Runnable {
 		try {
 	        final Map<WatchKey, Path> keys = new HashMap<>();
 			WatchService watchService = FileSystems.getDefault().newWatchService();
+			Path path = Paths.get(this.rootLocation);
+            Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
+                @Override
+                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                    WatchKey watchKey = dir.register(watchService, 
+                    		new WatchEvent.Kind[]{
+                    				StandardWatchEventKinds.ENTRY_CREATE,
+                    				StandardWatchEventKinds.ENTRY_DELETE,
+                    				StandardWatchEventKinds.ENTRY_MODIFY,
+                    				StandardWatchEventKinds.OVERFLOW}, 
+                    		SensitivityWatchEventModifier.MEDIUM);
+                    keys.put(watchKey, dir);
+                    return FileVisitResult.CONTINUE;
+                }
+            });
 			while (true) {
-				Path path = Paths.get(this.rootLocation);
-	            Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
-	                @Override
-	                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
-	                    WatchKey watchKey = dir.register(watchService, 
-	                    		new WatchEvent.Kind[]{
-	                    				StandardWatchEventKinds.ENTRY_CREATE,
-	                    				StandardWatchEventKinds.ENTRY_DELETE,
-	                    				StandardWatchEventKinds.ENTRY_MODIFY,
-	                    				StandardWatchEventKinds.OVERFLOW}, 
-	                    		SensitivityWatchEventModifier.HIGH);
-	                    keys.put(watchKey, dir);
-	                    return FileVisitResult.CONTINUE;
-	                }
-	            });
-				WatchKey watchKey = watchService.poll(1, TimeUnit.MINUTES);
+				WatchKey watchKey = watchService.take();
 				if (watchKey != null) {
 					for (WatchEvent<?> event : watchKey.pollEvents()) {
 						managingEvent(event);
 					}
+					watchKey.reset();
 				}
-				watchKey.reset();
-				Thread.sleep(10000);
 			}
 
 		} catch (IOException | InterruptedException e) {

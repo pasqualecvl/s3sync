@@ -1,7 +1,6 @@
 package it.pasqualecavallo.s3sync.model;
 
 import java.math.BigInteger;
-import java.util.List;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -14,13 +13,13 @@ public class Item {
 
 	private String ownedByFolder;
 
-	private String folderRelativePath;
-
 	private String originalName;
-
+	
 	private String s3Name;
-
-	private List<String> missingClientSynchronized;
+	
+	private Long lastUpdate;
+	
+	private String uploadedBy;
 
 	public BigInteger get_id() {
 		return _id;
@@ -36,14 +35,6 @@ public class Item {
 
 	public void setOwnedByFolder(String ownedByFolder) {
 		this.ownedByFolder = ownedByFolder;
-	}
-
-	public String getFolderRelativePath() {
-		return folderRelativePath;
-	}
-
-	public void setFolderRelativePath(String folderRelativePath) {
-		this.folderRelativePath = folderRelativePath;
 	}
 
 	public String getOriginalName() {
@@ -62,12 +53,23 @@ public class Item {
 		this.s3Name = s3Name;
 	}
 
-	public List<String> getMissingClientSynchronized() {
-		return missingClientSynchronized;
+	public Long getLastUpdate() {
+		return lastUpdate;
 	}
 
-	public void setMissingClientSynchronized(List<String> missingClientSynchronized) {
-		this.missingClientSynchronized = missingClientSynchronized;
+	public void setLastUpdate(Long lastUpdate) {
+		this.lastUpdate = lastUpdate;
 	}
 
+	public String getUploadedBy() {
+		return uploadedBy;
+	}
+	
+	public void setUploadedBy(String uploadedBy) {
+		this.uploadedBy = uploadedBy;
+	}
+	
+	public Item get() {
+		return this;
+	}
 }
