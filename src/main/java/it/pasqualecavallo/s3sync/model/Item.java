@@ -15,8 +15,6 @@ public class Item {
 
 	private String originalName;
 	
-	private String s3Name;
-	
 	private Long lastUpdate;
 	
 	private String uploadedBy;
@@ -43,14 +41,6 @@ public class Item {
 
 	public void setOriginalName(String originalName) {
 		this.originalName = originalName;
-	}
-
-	public String getS3Name() {
-		return s3Name;
-	}
-
-	public void setS3Name(String s3Name) {
-		this.s3Name = s3Name;
 	}
 
 	public Long getLastUpdate() {
