@@ -55,6 +55,8 @@ public class UploadService {
 		ResponseInputStream<GetObjectResponse> response = s3Client.getObject(request);
 		FileOutputStream outputStream;
 		try {
+			
+			
 			File file = new File(localFullPathFolder);
 			file.
 			outputStream = new FileOutputStream(localFullPathFolder);
