@@ -66,7 +66,21 @@ public class WatchListener implements Runnable {
 	}
 
 	private void managingEvent(WatchEvent<?> event) {
-		System.out.println("Catched event: " + event.kind().name());
+		switch(event.kind().name()) {
+		case "ENTRY_CREATE":
+			System.out.println("Creating file: " + event.context().toString());
+			break;
+		case "ENTRY_DELETE":
+			System.out.println("Deleting file: " + event.context().toString());
+			break;
+		case "ENTRY_MODIFY":
+			System.out.println("Modifing file: " + event.context().toString());
+			break;
+		default:
+			System.out.println("Unhandled event " + event.kind().name() + " on file " + event.context().toString());
+			
+		}
+			
 	}
 
 }
