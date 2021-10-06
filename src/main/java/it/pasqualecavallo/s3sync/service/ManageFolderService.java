@@ -24,6 +24,7 @@ public class ManageFolderService {
 	@Autowired
 	private SqsClient sqsClient;
 	
+	
 	public void addFolder(String localPath, String remotePath) {
 		String clientAlias = UserSpecificPropertiesManager.getProperty("client.alias");
 		AttachedClient client = mongoOperations.findOne(new Query(Criteria.where("alias").is(clientAlias)),

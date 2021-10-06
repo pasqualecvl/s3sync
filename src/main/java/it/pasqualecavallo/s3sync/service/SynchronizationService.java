@@ -22,6 +22,11 @@ import it.pasqualecavallo.s3sync.model.Item;
 import it.pasqualecavallo.s3sync.model.AttachedClient.SyncFolder;
 import it.pasqualecavallo.s3sync.utils.UserSpecificPropertiesManager;
 
+/**
+ * This service is responsible to synchronize local and remote data on startup.
+ * @author pasquale
+ *
+ */
 @Service
 public class SynchronizationService {
 
