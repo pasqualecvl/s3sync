@@ -17,7 +17,9 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 
+import it.pasqualecavallo.s3sync.model.AttachedClient;
 import it.pasqualecavallo.s3sync.model.Item;
+import it.pasqualecavallo.s3sync.model.AttachedClient.SyncFolder;
 import it.pasqualecavallo.s3sync.utils.UserSpecificPropertiesManager;
 
 @Service
@@ -31,7 +33,12 @@ public class SynchronizationService {
 
 	@PostConstruct
 	public void synchronizeOnStartup() {
-		synchronize("/Scaricati", "/home/pasquale/Prova");
+		AttachedClient client = mongoOperations.findOne(
+				new Query(Criteria.where("alias").is(
+						UserSpecificPropertiesManager.getProperty("client.alias"))), AttachedClient.class);
+		for(SyncFolder folder : client.getSyncFolder()) {
+			synchronize(folder.getRemotePath(), folder.getLocalPath());
+		}
 	}
 
 	public void synchronize(String remoteFolder, String localRootFolder) {
