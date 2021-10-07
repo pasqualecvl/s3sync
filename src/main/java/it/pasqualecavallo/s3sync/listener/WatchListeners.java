@@ -4,23 +4,23 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import software.amazon.awssdk.services.sqs.SqsClient;
+import it.pasqualecavallo.s3sync.service.UploadService;
 
 public class WatchListeners {
 	
 	private static Map<String, Thread> threadPool = new HashMap<>();
 	
-	public static void startThread(String rootLocation, SqsClient sqsClient) {
-		WatchListener listener = new WatchListener(rootLocation, sqsClient);
+	public static void startThread(UploadService uploadService, String remoteFolder, String localRootFolder) {
+		WatchListener listener = new WatchListener(uploadService, remoteFolder, localRootFolder);
 		Thread thread = new Thread(listener);
 		thread.start();
-		threadPool.put(rootLocation, thread);
+		threadPool.put(localRootFolder, thread);
 	}
 	
-	public static void stopThread(String rootLocation) {
-		if(threadPool.get(rootLocation) != null) {
-			threadPool.get(rootLocation).interrupt();
-			threadPool.remove(rootLocation);
+	public static void stopThread(String localRootFolder) {
+		if(threadPool.get(localRootFolder) != null) {
+			threadPool.get(localRootFolder).interrupt();
+			threadPool.remove(localRootFolder);
 		}
 	}
 	

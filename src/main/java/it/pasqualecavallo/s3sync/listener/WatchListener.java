@@ -14,20 +14,22 @@ import java.nio.file.WatchService;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 import com.sun.nio.file.SensitivityWatchEventModifier;
 
-import software.amazon.awssdk.services.sqs.SqsClient;
+import it.pasqualecavallo.s3sync.service.UploadService;
 
 public class WatchListener implements Runnable {
 
-	private String rootLocation;
-	private SqsClient sqsClient;
-
-	public WatchListener(String rootLocation, SqsClient sqsClient) {
-		this.rootLocation = rootLocation;
-		this.sqsClient = sqsClient;
+	private UploadService uploadService;
+	private String remoteFolder;
+	private String localRootFolder;
+	
+	public WatchListener(UploadService uploadService,
+			String remoteFolder, String localRootFolder) {
+		this.uploadService = uploadService;
+		this.remoteFolder = remoteFolder;
+		this.localRootFolder = localRootFolder;
 	}
 
 	@Override
@@ -35,7 +37,7 @@ public class WatchListener implements Runnable {
 		try {
 	        final Map<WatchKey, Path> keys = new HashMap<>();
 			WatchService watchService = FileSystems.getDefault().newWatchService();
-			Path path = Paths.get(this.rootLocation);
+			Path path = Paths.get(this.localRootFolder);
             Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
                 @Override
                 public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
@@ -66,19 +68,19 @@ public class WatchListener implements Runnable {
 	}
 
 	private void managingEvent(WatchEvent<?> event) {
+		Path path = (Path) event.context();
 		switch(event.kind().name()) {
 		case "ENTRY_CREATE":
-			System.out.println("Creating file: " + event.context().toString());
+		case "ENTRY_MODIFY":
+			System.out.println("Create or modify file: " + path.toString());
+			uploadService.upload(path, remoteFolder, path.toFile().getAbsolutePath().replaceFirst(localRootFolder, ""));
 			break;
 		case "ENTRY_DELETE":
-			System.out.println("Deleting file: " + event.context().toString());
-			break;
-		case "ENTRY_MODIFY":
-			System.out.println("Modifing file: " + event.context().toString());
+			System.out.println("Delete file: " + path.toString());
+			uploadService.delete(path, remoteFolder, path.toFile().getAbsolutePath().replaceFirst(localRootFolder, ""));
 			break;
 		default:
-			System.out.println("Unhandled event " + event.kind().name() + " on file " + event.context().toString());
-			
+			System.out.println("Unhandled event " + event.kind().name() + " on file " + event.context().toString());			
 		}
 			
 	}

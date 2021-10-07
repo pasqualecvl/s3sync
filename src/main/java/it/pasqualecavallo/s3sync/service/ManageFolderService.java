@@ -13,7 +13,6 @@ import it.pasqualecavallo.s3sync.listener.WatchListeners;
 import it.pasqualecavallo.s3sync.model.AttachedClient;
 import it.pasqualecavallo.s3sync.model.AttachedClient.SyncFolder;
 import it.pasqualecavallo.s3sync.utils.UserSpecificPropertiesManager;
-import software.amazon.awssdk.services.sqs.SqsClient;
 
 @Service
 public class ManageFolderService {
@@ -22,8 +21,10 @@ public class ManageFolderService {
 	private MongoOperations mongoOperations;
 
 	@Autowired
-	private SqsClient sqsClient;
+	private SynchronizationService synchronizationService;
 	
+	@Autowired
+	private UploadService uploadService;
 	
 	public void addFolder(String localPath, String remotePath) {
 		String clientAlias = UserSpecificPropertiesManager.getProperty("client.alias");
@@ -38,8 +39,8 @@ public class ManageFolderService {
 		});
 		if (!found.get()) {
 			addToPersistence(client, localPath, remotePath);
-			sync();
-			startListenerThread(localPath);
+			synchronizationService.synchronize(remotePath, localPath);
+			startListenerThread(remotePath, localPath);
 		}
 	}
 
@@ -51,11 +52,7 @@ public class ManageFolderService {
 		mongoOperations.save(client);
 	}
 
-	private void startListenerThread(String localPath) {
-		WatchListeners.startThread(localPath, sqsClient);
-	}
-	
-	private void sync() {
-		
+	private void startListenerThread(String remoteFolder, String localRootFolder) {
+		WatchListeners.startThread(uploadService, remoteFolder, localRootFolder);
 	}
 }

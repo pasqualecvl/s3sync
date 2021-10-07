@@ -16,7 +16,6 @@ import it.pasqualecavallo.s3sync.listener.WatchListeners;
 import it.pasqualecavallo.s3sync.model.AttachedClient;
 import it.pasqualecavallo.s3sync.model.AttachedClient.SyncFolder;
 import it.pasqualecavallo.s3sync.utils.UserSpecificPropertiesManager;
-import software.amazon.awssdk.services.sqs.SqsClient;
 
 @Service
 public class StartListenerService {
@@ -25,7 +24,7 @@ public class StartListenerService {
 	private MongoOperations mongoOperations;
 
 	@Autowired
-	private SqsClient sqsClient;
+	private UploadService uploadService;
 	
 	@PostConstruct
 	public void startListeners() {
@@ -42,7 +41,7 @@ public class StartListenerService {
 		} else {
 			List<SyncFolder> syncFolders = client.getSyncFolder();
 			for(SyncFolder folder : syncFolders) {
-				WatchListeners.startThread(folder.getLocalPath(), sqsClient);
+				WatchListeners.startThread(uploadService, folder.getRemotePath(), folder.getLocalPath());
 			}
 		}
 	}

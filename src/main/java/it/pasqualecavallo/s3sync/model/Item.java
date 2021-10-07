@@ -19,6 +19,8 @@ public class Item {
 	
 	private String uploadedBy;
 
+	private Boolean deleted = false;
+	
 	public BigInteger get_id() {
 		return _id;
 	}
@@ -59,7 +61,23 @@ public class Item {
 		this.uploadedBy = uploadedBy;
 	}
 	
+	public Boolean getDeleted() {
+		return deleted;
+	}
+	
+	public void setDeleted(Boolean deleted) {
+		this.deleted = deleted;
+	}
+	
 	public Item get() {
 		return this;
 	}
+
+	@Override
+	public String toString() {
+		return "Item [_id=" + _id + ", ownedByFolder=" + ownedByFolder + ", originalName=" + originalName
+				+ ", lastUpdate=" + lastUpdate + ", uploadedBy=" + uploadedBy + "]";
+	}
+	
+	
 }

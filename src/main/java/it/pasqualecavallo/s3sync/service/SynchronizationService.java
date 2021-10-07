@@ -47,57 +47,69 @@ public class SynchronizationService {
 	}
 
 	public void synchronize(String remoteFolder, String localRootFolder) {
-		List<Item> items = mongoOperations.find(new Query(Criteria.where("ownedByFolder").is(remoteFolder)),
-				Item.class);
-		Map<String, Item> mapItems = items.stream().collect(Collectors.toMap(Item::getOriginalName, Item::get));
 		try {
-			localToS3Sync(remoteFolder, localRootFolder, mapItems);
-			if (items != null) {
-				s3toLocalSync(remoteFolder, localRootFolder, items);
-			}
+			//DO NOT CHANGE THE ORDER
+			localToS3Sync(remoteFolder, localRootFolder);
+			s3toLocalSync(remoteFolder, localRootFolder);
 		} catch (IOException e) {
 			throw new RuntimeException("Exception synchronizing files", e);
 		}
 
 	}
 
-	private void localToS3Sync(String remoteFolder, String localRootFolder, Map<String, Item> items)
+	private void localToS3Sync(String remoteFolder, String localRootFolder)
 			throws IOException {
+		List<Item> items = mongoOperations.find(new Query(Criteria.where("ownedByFolder").is(remoteFolder)),
+				Item.class);
+		Map<String, Item> mapItems = items.stream().collect(Collectors.toMap(Item::getOriginalName, Item::get));
 		Files.walk(Paths.get(localRootFolder)).forEach(path -> {
 			File file = path.toFile();
 			if (file.isFile() && file.canRead()) {
 				// FIXME: apply regex filters here
 				String relativePath = file.getAbsolutePath().replaceFirst(localRootFolder, "");
-				if (!items.containsKey(relativePath) || items.get(relativePath).getLastUpdate() < file.lastModified()) {
-					uploadService.upload(path, relativePath, remoteFolder, items.get(relativePath));
-				}
+				if(!mapItems.containsKey(relativePath) || 
+						(mapItems.containsKey(relativePath) && mapItems.get(relativePath).getLastUpdate() < file.lastModified())) {
+					uploadService.upload(path, relativePath, remoteFolder, mapItems.get(relativePath));
+				} 
 			}
 		});
 	}
 
-	private void s3toLocalSync(String remoteFolder, String localRootFolder, List<Item> items) {
+	private void s3toLocalSync(String remoteFolder, String localRootFolder) {
+		List<Item> items = mongoOperations.find(new Query(Criteria.where("ownedByFolder").is(remoteFolder)),
+				Item.class);
 		for (Item item : items) {
-			if (item.getUploadedBy().equals(UserSpecificPropertiesManager.getProperty("client.alias"))) {
-				continue;
-			}
 			if (!localRootFolder.endsWith("/") && !item.getOriginalName().startsWith("/")) {
 				localRootFolder = localRootFolder + "/";
 			}
 			String itemLocalFullLocation = localRootFolder + item.getOriginalName();
 			Path itemLocalFullPath = Paths.get(itemLocalFullLocation);
-			// check for file exists
-			// FIXME: apply regex filters here
-			if (Files.exists(itemLocalFullPath)) {
-				// check for obsolete file
-				if (itemLocalFullPath.toFile().lastModified() < item.getLastUpdate()) {
-					// file is obsolete, go for update
+			if(item.getDeleted()) {
+				try {
+					if(Files.exists(itemLocalFullPath) && Files.isWritable(itemLocalFullPath)) {
+						Files.delete(itemLocalFullPath);						
+					}
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			} else {
+				if (item.getUploadedBy().equals(UserSpecificPropertiesManager.getProperty("client.alias"))) {
+					continue;
+				}
+				// check for file exists
+				// FIXME: apply regex filters here
+				if (Files.exists(itemLocalFullPath)) {
+					// check for obsolete file
+					if (itemLocalFullPath.toFile().lastModified() < item.getLastUpdate()) {
+						// file is obsolete, go for update
+						uploadService.getOrUpdate(itemLocalFullLocation,
+								item.getOwnedByFolder() + "/" + item.getOriginalName());
+					}
+					// file exists and up to date
+				} else {
 					uploadService.getOrUpdate(itemLocalFullLocation,
 							item.getOwnedByFolder() + "/" + item.getOriginalName());
-				}
-				// file exists and up to date
-			} else {
-				uploadService.getOrUpdate(itemLocalFullLocation,
-						item.getOwnedByFolder() + "/" + item.getOriginalName());
+				}				
 			}
 		}
 	}
