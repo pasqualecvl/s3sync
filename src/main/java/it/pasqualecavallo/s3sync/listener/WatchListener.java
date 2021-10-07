@@ -35,6 +35,10 @@ public class WatchListener implements Runnable {
 	@Override
 	public void run() {
 		try {
+			// Operation locked by batch processes (like startup synchonization, batch synchronization, etc)
+			if(!WatchListeners.threadNotLocked()) {
+				return;
+			}
 	        final Map<WatchKey, Path> keys = new HashMap<>();
 			WatchService watchService = FileSystems.getDefault().newWatchService();
 			Path path = Paths.get(this.localRootFolder);

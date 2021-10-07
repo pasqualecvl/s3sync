@@ -5,8 +5,11 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.attribute.FileTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.stream.Collectors;
 
 import javax.annotation.PostConstruct;
@@ -17,6 +20,7 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 
+import it.pasqualecavallo.s3sync.listener.WatchListeners;
 import it.pasqualecavallo.s3sync.model.AttachedClient;
 import it.pasqualecavallo.s3sync.model.Item;
 import it.pasqualecavallo.s3sync.model.AttachedClient.SyncFolder;
@@ -35,14 +39,28 @@ public class SynchronizationService {
 
 	@Autowired
 	private UploadService uploadService;
+	
+	
+	private volatile Map<String, String> synchronizedFolder = new HashMap<>();
 
 	@PostConstruct
 	public void synchronizeOnStartup() {
-		AttachedClient client = mongoOperations.findOne(
-				new Query(Criteria.where("alias").is(
-						UserSpecificPropertiesManager.getProperty("client.alias"))), AttachedClient.class);
-		for(SyncFolder folder : client.getSyncFolder()) {
-			synchronize(folder.getRemotePath(), folder.getLocalPath());
+		WatchListeners.lockSemaphore();
+		try {
+			AttachedClient client = mongoOperations.findOne(
+					new Query(Criteria.where("alias").is(
+							UserSpecificPropertiesManager.getProperty("client.alias"))), AttachedClient.class);
+			//fast fill synchronizedFolder map
+			client.getSyncFolder().forEach(folder -> {
+				synchronized(synchronizedFolder) {
+					synchronizedFolder.put(folder.getLocalPath(), folder.getRemotePath());
+				}
+			});
+			client.getSyncFolder().forEach( folder -> {
+				synchronize(folder.getRemotePath(), folder.getLocalPath());			
+			});
+		} finally {
+			WatchListeners.releaseSemaphore();
 		}
 	}
 
@@ -104,13 +122,57 @@ public class SynchronizationService {
 						// file is obsolete, go for update
 						uploadService.getOrUpdate(itemLocalFullLocation,
 								item.getOwnedByFolder() + "/" + item.getOriginalName());
+						//update created file last modified to prevent synchronization loop
+						try {
+							Files.setLastModifiedTime(itemLocalFullPath, FileTime.fromMillis(item.getLastUpdate()));
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
 					}
 					// file exists and up to date
 				} else {
 					uploadService.getOrUpdate(itemLocalFullLocation,
 							item.getOwnedByFolder() + "/" + item.getOriginalName());
+					try {
+						Files.setLastModifiedTime(itemLocalFullPath, FileTime.fromMillis(item.getLastUpdate()));
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
 				}				
 			}
 		}
 	}
+	
+	public void removeSynchronizationFolder(String localRootFolder) {
+		synchronized(synchronizedFolder) {
+			synchronizedFolder.remove(localRootFolder);
+		}
+		AttachedClient client = mongoOperations.findOne(
+				new Query(
+						Criteria.where("alias").is(
+								UserSpecificPropertiesManager.getProperty("client.alias"))), 
+				AttachedClient.class);
+		
+		for(SyncFolder folder : client.getSyncFolder()) {
+			if(folder.getLocalPath().equals(localRootFolder)) {
+				client.getSyncFolder().remove(folder);
+				break;
+			}
+		}
+		mongoOperations.save(client);
+	}
+	
+	public String getSynchronizedRemoteFolderByLocalRootFolder(String localRootFolder) {
+		return synchronizedFolder.get(localRootFolder);
+	}
+	
+	public String getSynchronizedLocalRootFolderByRemoteFolder(String remoteFolder) {
+		for(Entry<String, String> entry : synchronizedFolder.entrySet()) {
+			if(entry.getValue().equals(remoteFolder)) {
+				return entry.getKey();
+			}
+		}
+		return null;
+	}
+	
 }

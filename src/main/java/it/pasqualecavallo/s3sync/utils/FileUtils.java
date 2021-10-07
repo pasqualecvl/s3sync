@@ -27,8 +27,8 @@ public class FileUtils {
 			}
 		}
 		try (FileOutputStream fos = new FileOutputStream(fullPath)) {
-			   fos.write(content);
-		}
+			  fos.write(content);
+		}		
 	}
 
 	public static void deleteFileAndEmptyTree(String fullPath) {

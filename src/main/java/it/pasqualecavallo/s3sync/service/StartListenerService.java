@@ -3,8 +3,6 @@ package it.pasqualecavallo.s3sync.service;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.annotation.PostConstruct;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -26,7 +24,6 @@ public class StartListenerService {
 	@Autowired
 	private UploadService uploadService;
 	
-	@PostConstruct
 	public void startListeners() {
 		String clientAlias = UserSpecificPropertiesManager.getProperty("client.alias");
 		AttachedClient client = mongoOperations.findOne(
