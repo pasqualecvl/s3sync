@@ -1,19 +1,15 @@
 package it.pasqualecavallo.s3sync.listener;
 
-public class SynchronizationMessageDto {
-	public String dest;
+import java.io.Serializable;
+
+public class SynchronizationMessageDto implements Serializable {
+
+	private static final long serialVersionUID = 204252542632494654L;
+
 	public String remoteFolder;
 	public String file;
 	public S3Action s3Action;
 	public Long time = System.currentTimeMillis();
-
-	public String getDest() {
-		return dest;
-	}
-
-	public void setDest(String dest) {
-		this.dest = dest;
-	}
 
 	public String getRemoteFolder() {
 		return remoteFolder;
@@ -53,8 +49,8 @@ public class SynchronizationMessageDto {
 
 	@Override
 	public String toString() {
-		return "SynchronizationMessageDto [dest=" + dest + ", remoteFolder=" + remoteFolder + ", file=" + file
-				+ ", s3Action=" + s3Action + ", time=" + time + "]";
+		return "SynchronizationMessageDto [remoteFolder=" + remoteFolder + ", file=" + file + ", s3Action=" + s3Action
+				+ ", time=" + time + "]";
 	}
 
 }

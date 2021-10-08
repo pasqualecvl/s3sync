@@ -36,9 +36,6 @@ public class WatchListener implements Runnable {
 	public void run() {
 		try {
 			// Operation locked by batch processes (like startup synchonization, batch synchronization, etc)
-			if(!WatchListeners.threadNotLocked()) {
-				return;
-			}
 	        final Map<WatchKey, Path> keys = new HashMap<>();
 			WatchService watchService = FileSystems.getDefault().newWatchService();
 			Path path = Paths.get(this.localRootFolder);
@@ -57,12 +54,16 @@ public class WatchListener implements Runnable {
                 }
             });
 			while (true) {
-				WatchKey watchKey = watchService.take();
-				if (watchKey != null) {
-					for (WatchEvent<?> event : watchKey.pollEvents()) {
-						managingEvent(event);
+				if(WatchListeners.threadNotLocked()) {
+					WatchKey watchKey = watchService.take();
+					if (watchKey != null) {
+						for (WatchEvent<?> event : watchKey.pollEvents()) {
+							managingEvent(event);
+						}
+						watchKey.reset();
 					}
-					watchKey.reset();
+				} else {
+					Thread.sleep(1000);
 				}
 			}
 
@@ -77,7 +78,7 @@ public class WatchListener implements Runnable {
 		case "ENTRY_CREATE":
 		case "ENTRY_MODIFY":
 			System.out.println("Create or modify file: " + path.toString());
-			uploadService.upload(path, remoteFolder, path.toFile().getAbsolutePath().replaceFirst(localRootFolder, ""));
+			uploadService.upload(path, remoteFolder, localRootFolder + "/" + path.toFile().getAbsolutePath());
 			break;
 		case "ENTRY_DELETE":
 			System.out.println("Delete file: " + path.toString());
