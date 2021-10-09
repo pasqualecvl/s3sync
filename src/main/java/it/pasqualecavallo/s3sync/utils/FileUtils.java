@@ -7,6 +7,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 public class FileUtils {
 
@@ -68,4 +69,17 @@ public class FileUtils {
 		return tokens;
 	}
 
+	public static boolean notMatchFilters(List<Pattern> patterns, Path path) {
+		if(patterns == null) {
+			return true;
+		}
+		String pathName = path.toString();
+		for(Pattern pattern : patterns) {
+			if(pattern.matcher(pathName).matches()) {
+				return false;
+			}
+		}
+		return true;
+	}
+	
 }
