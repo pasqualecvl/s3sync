@@ -31,6 +31,7 @@ import it.pasqualecavallo.s3sync.utils.UserSpecificPropertiesManager;
 
 /**
  * This service is responsible to synchronize local and remote data on startup.
+ * 
  * @author pasquale
  *
  */
@@ -42,33 +43,32 @@ public class SynchronizationService {
 
 	@Autowired
 	private UploadService uploadService;
-	
-	
+
 	private static volatile Map<String, String> synchronizedFolder = new HashMap<>();
 	private static volatile Map<String, List<Pattern>> exclusionPatterns = new HashMap<>();
-	
-	
+
 	@PostConstruct
 	public void synchronizeOnStartup() {
 		WatchListeners.lockSemaphore();
 		try {
 			AttachedClient client = mongoOperations.findOne(
-					new Query(Criteria.where("alias").is(
-							UserSpecificPropertiesManager.getProperty("client.alias"))), AttachedClient.class);
-			//fast fill synchronizedFolder map
+					new Query(Criteria.where("alias").is(UserSpecificPropertiesManager.getProperty("client.alias"))),
+					AttachedClient.class);
+			// fast fill synchronizedFolder map
 			client.getSyncFolder().forEach(folder -> {
-				synchronized(synchronizedFolder) {
+				synchronized (synchronizedFolder) {
 					synchronizedFolder.put(folder.getLocalPath(), folder.getRemotePath());
 				}
-				synchronized(exclusionPatterns) {
-					exclusionPatterns.put(folder.getLocalPath(), 
-							folder.getExclusionPattern().stream().map(pattern -> {
-						return Pattern.compile(pattern);
-					}).collect(Collectors.toList()));
+				synchronized (exclusionPatterns) {
+					exclusionPatterns.put(folder.getLocalPath(), folder.getExclusionPattern() != null
+							? folder.getExclusionPattern().stream().map(pattern -> {
+								return Pattern.compile(pattern);
+							}).collect(Collectors.toList())
+							: new ArrayList<>());
 				}
 			});
-			client.getSyncFolder().forEach( folder -> {
-				synchronize(folder.getRemotePath(), folder.getLocalPath());			
+			client.getSyncFolder().forEach(folder -> {
+				synchronize(folder.getRemotePath(), folder.getLocalPath());
 			});
 		} finally {
 			WatchListeners.releaseSemaphore();
@@ -77,7 +77,7 @@ public class SynchronizationService {
 
 	public void synchronize(String remoteFolder, String localRootFolder) {
 		try {
-			//DO NOT CHANGE THE ORDER
+			// DO NOT CHANGE THE ORDER
 			localToS3Sync(remoteFolder, localRootFolder);
 			s3toLocalSync(remoteFolder, localRootFolder);
 		} catch (IOException e) {
@@ -86,20 +86,20 @@ public class SynchronizationService {
 
 	}
 
-	private void localToS3Sync(String remoteFolder, String localRootFolder)
-			throws IOException {
+	private void localToS3Sync(String remoteFolder, String localRootFolder) throws IOException {
 		List<Item> items = mongoOperations.find(new Query(Criteria.where("ownedByFolder").is(remoteFolder)),
 				Item.class);
 		Map<String, Item> mapItems = items.stream().collect(Collectors.toMap(Item::getOriginalName, Item::get));
 		Files.walk(Paths.get(localRootFolder)).forEach(path -> {
 			File file = path.toFile();
-			if (file.isFile() && file.canRead() && FileUtils.notMatchFilters(exclusionPatterns.get(localRootFolder), path)) {
+			if (file.isFile() && file.canRead()
+					&& FileUtils.notMatchFilters(exclusionPatterns.get(localRootFolder), path.toString().replaceFirst(localRootFolder, ""))) {
 				// FIXME: apply regex filters here
 				String relativePath = file.getAbsolutePath().replaceFirst(localRootFolder, "");
-				if(!mapItems.containsKey(relativePath) || 
-						(mapItems.containsKey(relativePath) && mapItems.get(relativePath).getLastUpdate() < file.lastModified())) {
+				if (!mapItems.containsKey(relativePath) || (mapItems.containsKey(relativePath)
+						&& mapItems.get(relativePath).getLastUpdate() < file.lastModified())) {
 					uploadService.upload(path, relativePath, remoteFolder, mapItems.get(relativePath));
-				} 
+				}
 			}
 		});
 	}
@@ -113,18 +113,23 @@ public class SynchronizationService {
 			}
 			String itemLocalFullLocation = localRootFolder + item.getOriginalName();
 			Path itemLocalFullPath = Paths.get(itemLocalFullLocation);
-			if(!FileUtils.notMatchFilters(exclusionPatterns.get(localRootFolder), itemLocalFullPath)) {
-				if(item.getDeleted()) {
+			if (FileUtils.notMatchFilters(exclusionPatterns.get(localRootFolder), item.getOriginalName())) {
+				if (item.getDeleted()) {
 					try {
-						if(Files.exists(itemLocalFullPath) && Files.isWritable(itemLocalFullPath)) {
-							Files.delete(itemLocalFullPath);						
+						if (Files.exists(itemLocalFullPath) && Files.isWritable(itemLocalFullPath)) {
+							Files.delete(itemLocalFullPath);
 						}
 					} catch (IOException e) {
 						e.printStackTrace();
 					}
 				} else {
 					if (item.getUploadedBy().equals(UserSpecificPropertiesManager.getProperty("client.alias"))) {
-						continue;
+						//deleted items -> uploaded by current user but not found on local machine
+						if(!Path.of(localRootFolder + item.getOriginalName()).toFile().exists()) {
+							uploadService.delete(Path.of(localRootFolder + item.getOriginalName()), 
+									remoteFolder, item.getOriginalName());
+						}
+						continue;							
 					}
 					// check for file exists
 					// FIXME: apply regex filters here
@@ -134,7 +139,7 @@ public class SynchronizationService {
 							// file is obsolete, go for update
 							uploadService.getOrUpdate(itemLocalFullLocation,
 									item.getOwnedByFolder() + "/" + item.getOriginalName());
-							//update created file last modified to prevent synchronization loop
+							// update created file last modified to prevent synchronization loop
 							try {
 								Files.setLastModifiedTime(itemLocalFullPath, FileTime.fromMillis(item.getLastUpdate()));
 							} catch (IOException e) {
@@ -150,45 +155,44 @@ public class SynchronizationService {
 						} catch (IOException e) {
 							e.printStackTrace();
 						}
-					}				
-				}				
+					}
+				}
 			}
 		}
 	}
-	
+
 	public void removeSynchronizationFolder(String localRootFolder) {
-		synchronized(synchronizedFolder) {
+		synchronized (synchronizedFolder) {
 			synchronizedFolder.remove(localRootFolder);
 		}
 		AttachedClient client = mongoOperations.findOne(
-				new Query(
-						Criteria.where("alias").is(
-								UserSpecificPropertiesManager.getProperty("client.alias"))), 
+				new Query(Criteria.where("alias").is(UserSpecificPropertiesManager.getProperty("client.alias"))),
 				AttachedClient.class);
-		
-		for(SyncFolder folder : client.getSyncFolder()) {
-			if(folder.getLocalPath().equals(localRootFolder)) {
+
+		for (SyncFolder folder : client.getSyncFolder()) {
+			if (folder.getLocalPath().equals(localRootFolder)) {
 				client.getSyncFolder().remove(folder);
 				break;
 			}
 		}
 		mongoOperations.save(client);
 	}
-	
+
 	public String getSynchronizedRemoteFolderByLocalRootFolder(String localRootFolder) {
 		return synchronizedFolder.get(localRootFolder);
 	}
-	
+
 	public static String getSynchronizedLocalRootFolderByRemoteFolder(String remoteFolder) {
-		for(Entry<String, String> entry : synchronizedFolder.entrySet()) {
-			if(entry.getValue().equals(remoteFolder)) {
+		for (Entry<String, String> entry : synchronizedFolder.entrySet()) {
+			if (entry.getValue().equals(remoteFolder)) {
 				return entry.getKey();
 			}
 		}
 		return null;
 	}
-	
+
 	public static List<Pattern> getExclusionPattern(String rootLocalFolder) {
 		return exclusionPatterns.get(rootLocalFolder);
 	}
+
 }

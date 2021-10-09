@@ -88,7 +88,7 @@ public class UploadService {
 		Item item = mongoOperations.findOne(
 				new Query(Criteria.where("ownedByFolder").is(remoteFolder).and("originalName").is(relativePath)),
 				Item.class);
-		upload(path, remoteFolder, relativePath, item);
+		upload(path, relativePath, remoteFolder, item);
 
 	}
 
@@ -108,7 +108,7 @@ public class UploadService {
 	public void delete(Path path, String remoteFolder, String relativePath) {
 		System.out.println("Deleting object " + relativePath + "from s3 folder " + remoteFolder);
 		DeleteObjectRequest s3request = DeleteObjectRequest.builder()
-				.bucket(GlobalPropertiesManager.getProperty("s3.bucket")).key(remoteFolder + "/" + relativePath)
+				.bucket(GlobalPropertiesManager.getProperty("s3.bucket")).key(remoteFolder + relativePath)
 				.build();
 		DeleteObjectResponse response = s3Client.deleteObject(s3request);
 		System.out.println("Mark item as deleted");
