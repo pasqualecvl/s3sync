@@ -45,7 +45,8 @@ public class AttachedClient {
 
 		private String localPath;
 		private String remotePath;
-
+		private List<String> exclusionPattern;
+		
 		public String getLocalPath() {
 			return localPath;
 		}
@@ -61,7 +62,14 @@ public class AttachedClient {
 		public void setRemotePath(String remotePath) {
 			this.remotePath = remotePath;
 		}
-
+		
+		public List<String> getExclusionPattern() {
+			return exclusionPattern;
+		}
+		
+		public void setExclusionPattern(List<String> exclusionPattern) {
+			this.exclusionPattern = exclusionPattern;
+		}
 	}
 
 }

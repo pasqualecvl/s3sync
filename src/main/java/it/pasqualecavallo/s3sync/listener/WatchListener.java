@@ -13,11 +13,18 @@ import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
+
+import org.apache.tomcat.util.http.fileupload.FileUpload;
 
 import com.sun.nio.file.SensitivityWatchEventModifier;
 
+import ch.qos.logback.core.util.FileUtil;
+import it.pasqualecavallo.s3sync.service.SynchronizationService;
 import it.pasqualecavallo.s3sync.service.UploadService;
+import it.pasqualecavallo.s3sync.utils.FileUtils;
 
 public class WatchListener implements Runnable {
 
@@ -74,20 +81,21 @@ public class WatchListener implements Runnable {
 
 	private void managingEvent(WatchEvent<?> event) {
 		Path path = (Path) event.context();
-		switch(event.kind().name()) {
-		case "ENTRY_CREATE":
-		case "ENTRY_MODIFY":
-			System.out.println("Create or modify file: " + path.toString());
-			uploadService.upload(path, remoteFolder, localRootFolder + "/" + path.toFile().getAbsolutePath());
-			break;
-		case "ENTRY_DELETE":
-			System.out.println("Delete file: " + path.toString());
-			uploadService.delete(path, remoteFolder, path.toFile().getAbsolutePath().replaceFirst(localRootFolder, ""));
-			break;
-		default:
-			System.out.println("Unhandled event " + event.kind().name() + " on file " + event.context().toString());			
+		if(FileUtils.notMatchFilters(SynchronizationService.getExclusionPattern(localRootFolder), path)) {
+			switch(event.kind().name()) {
+			case "ENTRY_CREATE":
+			case "ENTRY_MODIFY":
+				System.out.println("Create or modify file: " + path.toString());
+				uploadService.upload(path, remoteFolder, localRootFolder + "/" + path.toFile().getAbsolutePath());
+				break;
+			case "ENTRY_DELETE":
+				System.out.println("Delete file: " + path.toString());
+				uploadService.delete(path, remoteFolder, path.toFile().getAbsolutePath().replaceFirst(localRootFolder, ""));
+				break;
+			default:
+				System.out.println("Unhandled event " + event.kind().name() + " on file " + event.context().toString());			
+			}			
 		}
-			
 	}
 
 }

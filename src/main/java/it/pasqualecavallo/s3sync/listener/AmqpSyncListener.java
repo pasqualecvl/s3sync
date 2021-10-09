@@ -18,21 +18,17 @@ import it.pasqualecavallo.s3sync.utils.FileUtils;
 public class AmqpSyncListener {
 
 	@Autowired
-	private SynchronizationService synchronizationService;
-
-	@Autowired
 	@Qualifier("sqsJsonMapper")
 	private JsonMapper jsonMapper;
 
 	@Autowired
 	private UploadService uploadService;
 
-//	@RabbitListener(queues = "s3sync")
 	public void receiveSyncMessage(String message) {
 		WatchListeners.lockSemaphore();
 		try {
 			SynchronizationMessageDto dto = jsonMapper.readValue(message, SynchronizationMessageDto.class);
-			String localFolder = synchronizationService
+			String localFolder = SynchronizationService
 					.getSynchronizedLocalRootFolderByRemoteFolder(dto.getRemoteFolder());
 			if(localFolder != null) {
 				if (S3Action.CREATE.equals(dto.getS3Action()) || S3Action.MODIFY.equals(dto.getS3Action())) {

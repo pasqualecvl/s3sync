@@ -58,12 +58,12 @@ public class UploadService {
 			PutObjectRequest objectRequest = PutObjectRequest.builder()
 				.bucket(GlobalPropertiesManager.getProperty("s3.bucket")).key(remoteFolder + relativePath)
 				.build();
-			PutObjectResponse response = s3Client.putObject(objectRequest, Path.of(remoteFolder + "/" + relativePath));
+			PutObjectResponse response = s3Client.putObject(objectRequest, path);
 			if (response.eTag() != null) {
-				AtomicBoolean isCreate = new AtomicBoolean(false);
-				if (item == null) {
+			boolean isCreate = false;
+			if (item == null) {
 					System.out.println("Item not found, mark as creation");
-					isCreate.set(true);
+					isCreate = true;
 					item = new Item();
 					item.setOriginalName(relativePath);
 					item.setOwnedByFolder(remoteFolder);
@@ -75,7 +75,7 @@ public class UploadService {
 				SynchronizationMessageDto dto = new SynchronizationMessageDto();
 				dto.setFile(relativePath);
 				dto.setRemoteFolder(remoteFolder);
-				dto.setS3Action(isCreate.get() ? S3Action.CREATE : S3Action.MODIFY);
+				dto.setS3Action(isCreate ? S3Action.CREATE : S3Action.MODIFY);
 				amqpTemplate.convertAndSend(dto);
 			}
 		} catch(UncheckedIOException e) {

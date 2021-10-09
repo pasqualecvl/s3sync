@@ -6,10 +6,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.FileTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import javax.annotation.PostConstruct;
@@ -24,6 +26,7 @@ import it.pasqualecavallo.s3sync.listener.WatchListeners;
 import it.pasqualecavallo.s3sync.model.AttachedClient;
 import it.pasqualecavallo.s3sync.model.Item;
 import it.pasqualecavallo.s3sync.model.AttachedClient.SyncFolder;
+import it.pasqualecavallo.s3sync.utils.FileUtils;
 import it.pasqualecavallo.s3sync.utils.UserSpecificPropertiesManager;
 
 /**
@@ -41,8 +44,10 @@ public class SynchronizationService {
 	private UploadService uploadService;
 	
 	
-	private volatile Map<String, String> synchronizedFolder = new HashMap<>();
-
+	private static volatile Map<String, String> synchronizedFolder = new HashMap<>();
+	private static volatile Map<String, List<Pattern>> exclusionPatterns = new HashMap<>();
+	
+	
 	@PostConstruct
 	public void synchronizeOnStartup() {
 		WatchListeners.lockSemaphore();
@@ -54,6 +59,12 @@ public class SynchronizationService {
 			client.getSyncFolder().forEach(folder -> {
 				synchronized(synchronizedFolder) {
 					synchronizedFolder.put(folder.getLocalPath(), folder.getRemotePath());
+				}
+				synchronized(exclusionPatterns) {
+					exclusionPatterns.put(folder.getLocalPath(), 
+							folder.getExclusionPattern().stream().map(pattern -> {
+						return Pattern.compile(pattern);
+					}).collect(Collectors.toList()));
 				}
 			});
 			client.getSyncFolder().forEach( folder -> {
@@ -82,7 +93,7 @@ public class SynchronizationService {
 		Map<String, Item> mapItems = items.stream().collect(Collectors.toMap(Item::getOriginalName, Item::get));
 		Files.walk(Paths.get(localRootFolder)).forEach(path -> {
 			File file = path.toFile();
-			if (file.isFile() && file.canRead()) {
+			if (file.isFile() && file.canRead() && FileUtils.notMatchFilters(exclusionPatterns.get(localRootFolder), path)) {
 				// FIXME: apply regex filters here
 				String relativePath = file.getAbsolutePath().replaceFirst(localRootFolder, "");
 				if(!mapItems.containsKey(relativePath) || 
@@ -102,42 +113,44 @@ public class SynchronizationService {
 			}
 			String itemLocalFullLocation = localRootFolder + item.getOriginalName();
 			Path itemLocalFullPath = Paths.get(itemLocalFullLocation);
-			if(item.getDeleted()) {
-				try {
-					if(Files.exists(itemLocalFullPath) && Files.isWritable(itemLocalFullPath)) {
-						Files.delete(itemLocalFullPath);						
+			if(!FileUtils.notMatchFilters(exclusionPatterns.get(localRootFolder), itemLocalFullPath)) {
+				if(item.getDeleted()) {
+					try {
+						if(Files.exists(itemLocalFullPath) && Files.isWritable(itemLocalFullPath)) {
+							Files.delete(itemLocalFullPath);						
+						}
+					} catch (IOException e) {
+						e.printStackTrace();
 					}
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-			} else {
-				if (item.getUploadedBy().equals(UserSpecificPropertiesManager.getProperty("client.alias"))) {
-					continue;
-				}
-				// check for file exists
-				// FIXME: apply regex filters here
-				if (Files.exists(itemLocalFullPath)) {
-					// check for obsolete file
-					if (itemLocalFullPath.toFile().lastModified() < item.getLastUpdate()) {
-						// file is obsolete, go for update
+				} else {
+					if (item.getUploadedBy().equals(UserSpecificPropertiesManager.getProperty("client.alias"))) {
+						continue;
+					}
+					// check for file exists
+					// FIXME: apply regex filters here
+					if (Files.exists(itemLocalFullPath)) {
+						// check for obsolete file
+						if (itemLocalFullPath.toFile().lastModified() < item.getLastUpdate()) {
+							// file is obsolete, go for update
+							uploadService.getOrUpdate(itemLocalFullLocation,
+									item.getOwnedByFolder() + "/" + item.getOriginalName());
+							//update created file last modified to prevent synchronization loop
+							try {
+								Files.setLastModifiedTime(itemLocalFullPath, FileTime.fromMillis(item.getLastUpdate()));
+							} catch (IOException e) {
+								e.printStackTrace();
+							}
+						}
+						// file exists and up to date
+					} else {
 						uploadService.getOrUpdate(itemLocalFullLocation,
 								item.getOwnedByFolder() + "/" + item.getOriginalName());
-						//update created file last modified to prevent synchronization loop
 						try {
 							Files.setLastModifiedTime(itemLocalFullPath, FileTime.fromMillis(item.getLastUpdate()));
 						} catch (IOException e) {
 							e.printStackTrace();
 						}
-					}
-					// file exists and up to date
-				} else {
-					uploadService.getOrUpdate(itemLocalFullLocation,
-							item.getOwnedByFolder() + "/" + item.getOriginalName());
-					try {
-						Files.setLastModifiedTime(itemLocalFullPath, FileTime.fromMillis(item.getLastUpdate()));
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
+					}				
 				}				
 			}
 		}
@@ -166,7 +179,7 @@ public class SynchronizationService {
 		return synchronizedFolder.get(localRootFolder);
 	}
 	
-	public String getSynchronizedLocalRootFolderByRemoteFolder(String remoteFolder) {
+	public static String getSynchronizedLocalRootFolderByRemoteFolder(String remoteFolder) {
 		for(Entry<String, String> entry : synchronizedFolder.entrySet()) {
 			if(entry.getValue().equals(remoteFolder)) {
 				return entry.getKey();
@@ -175,4 +188,7 @@ public class SynchronizationService {
 		return null;
 	}
 	
+	public static List<Pattern> getExclusionPattern(String rootLocalFolder) {
+		return exclusionPatterns.get(rootLocalFolder);
+	}
 }
