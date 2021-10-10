@@ -138,7 +138,7 @@ public class SynchronizationService {
 						if (itemLocalFullPath.toFile().lastModified() < item.getLastUpdate()) {
 							// file is obsolete, go for update
 							uploadService.getOrUpdate(itemLocalFullLocation,
-									item.getOwnedByFolder() + "/" + item.getOriginalName());
+									item.getOwnedByFolder() + item.getOriginalName());
 							// update created file last modified to prevent synchronization loop
 							try {
 								Files.setLastModifiedTime(itemLocalFullPath, FileTime.fromMillis(item.getLastUpdate()));
@@ -149,7 +149,7 @@ public class SynchronizationService {
 						// file exists and up to date
 					} else {
 						uploadService.getOrUpdate(itemLocalFullLocation,
-								item.getOwnedByFolder() + "/" + item.getOriginalName());
+								item.getOwnedByFolder() + item.getOriginalName());
 						try {
 							Files.setLastModifiedTime(itemLocalFullPath, FileTime.fromMillis(item.getLastUpdate()));
 						} catch (IOException e) {

@@ -99,7 +99,7 @@ public class UploadService {
 				.key(remoteFullPathFolder).build();
 		ResponseInputStream<GetObjectResponse> response = s3Client.getObject(request);
 		try {
-			FileUtils.createFileTree(remoteFullPathFolder, response.readAllBytes());
+			FileUtils.createFileTree(localFullPathFolder, response.readAllBytes());
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
