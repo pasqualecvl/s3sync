@@ -62,9 +62,9 @@ public class SynchronizationService {
 				}
 				synchronized(exclusionPatterns) {
 					exclusionPatterns.put(folder.getLocalPath(), 
-							folder.getExclusionPattern().stream().map(pattern -> {
+							folder.getExclusionPattern() != null ? folder.getExclusionPattern().stream().map(pattern -> {
 						return Pattern.compile(pattern);
-					}).collect(Collectors.toList()));
+					}).collect(Collectors.toList()) : new ArrayList<>());
 				}
 			});
 			client.getSyncFolder().forEach( folder -> {
