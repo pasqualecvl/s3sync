@@ -14,15 +14,10 @@ import java.nio.file.WatchService;
 import java.nio.file.Watchable;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
-
-import org.apache.tomcat.util.http.fileupload.FileUpload;
 
 import com.sun.nio.file.SensitivityWatchEventModifier;
 
-import ch.qos.logback.core.util.FileUtil;
 import it.pasqualecavallo.s3sync.service.SynchronizationService;
 import it.pasqualecavallo.s3sync.service.UploadService;
 import it.pasqualecavallo.s3sync.utils.FileUtils;
@@ -62,7 +57,8 @@ public class WatchListener implements Runnable {
 				}
 			});
 			while (true) {
-				if (WatchListeners.threadNotLocked()) {
+				// Operation locked by batch processes (like startup synchonization, batch synchronization, etc)
+				if(WatchListeners.threadNotLocked()) {
 					WatchKey watchKey = watchService.take();
 					if (watchKey != null) {
 						for (WatchEvent<?> event : watchKey.pollEvents()) {
@@ -74,7 +70,6 @@ public class WatchListener implements Runnable {
 					Thread.sleep(1000);
 				}
 			}
-
 		} catch (IOException | InterruptedException e) {
 			throw new RuntimeException("Cannot start listening thread", e);
 		}
