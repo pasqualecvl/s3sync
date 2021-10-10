@@ -67,9 +67,11 @@ public class SynchronizationService {
 							: new ArrayList<>());
 				}
 			});
-			client.getSyncFolder().forEach(folder -> {
-				synchronize(folder.getRemotePath(), folder.getLocalPath());
-			});
+			if(client.getClientConfiguration().isRunSynchronizationOnStartup()) {
+				client.getSyncFolder().forEach(folder -> {
+					synchronize(folder.getRemotePath(), folder.getLocalPath());
+				});				
+			}
 		} finally {
 			WatchListeners.releaseSemaphore();
 		}
