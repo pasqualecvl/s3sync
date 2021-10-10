@@ -69,13 +69,12 @@ public class FileUtils {
 		return tokens;
 	}
 
-	public static boolean notMatchFilters(List<Pattern> patterns, Path path) {
+	public static boolean notMatchFilters(List<Pattern> patterns, String path) {
 		if(patterns == null) {
 			return true;
 		}
-		String pathName = path.toString();
 		for(Pattern pattern : patterns) {
-			if(pattern.matcher(pathName).matches()) {
+			if(pattern.matcher(path).matches()) {
 				return false;
 			}
 		}
