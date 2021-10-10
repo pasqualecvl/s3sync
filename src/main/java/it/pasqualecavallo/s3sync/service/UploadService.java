@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.springframework.amqp.core.AmqpTemplate;
@@ -105,7 +106,7 @@ public class UploadService {
 		}
 	}
 
-	public void delete(Path path, String remoteFolder, String relativePath) {
+	public void delete(String remoteFolder, String relativePath) {
 		System.out.println("Deleting object " + relativePath + "from s3 folder " + remoteFolder);
 		DeleteObjectRequest s3request = DeleteObjectRequest.builder()
 				.bucket(GlobalPropertiesManager.getProperty("s3.bucket")).key(remoteFolder + relativePath)
@@ -127,6 +128,13 @@ public class UploadService {
 		dto.setRemoteFolder(remoteFolder);
 		dto.setS3Action(S3Action.DELETE);
 		amqpTemplate.convertAndSend(dto);
+	}
+
+	public void deleteAsFolder(String remoteFolder, String relativeLocation) {
+		List<Item> toDelete = mongoOperations.find(new Query(Criteria.where("ownedByFolder").is(remoteFolder).and("originalName").regex("/^"+relativeLocation+"/")), Item.class);
+		toDelete.forEach(item -> {
+			delete(item.getOwnedByFolder(), item.getOriginalName());
+		});
 	}
 
 }

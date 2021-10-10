@@ -104,9 +104,10 @@ public class WatchListener implements Runnable {
 					if (watchKeys.containsKey(fullLocation)) {
 						watchKeys.get(fullLocation).cancel();
 					}
+					uploadService.deleteAsFolder(remoteFolder, fullLocation.replaceFirst(localRootFolder, ""));
 				} else {
 					// FIXME: delete folder content, sign them as deleted in db
-					uploadService.delete(fullPath, remoteFolder, fullLocation.replaceFirst(localRootFolder, ""));
+					uploadService.delete(remoteFolder, fullLocation.replaceFirst(localRootFolder, ""));
 				}
 				break;
 			default:

@@ -126,8 +126,7 @@ public class SynchronizationService {
 					if (item.getUploadedBy().equals(UserSpecificPropertiesManager.getProperty("client.alias"))) {
 						//deleted items -> uploaded by current user but not found on local machine
 						if(!Path.of(localRootFolder + item.getOriginalName()).toFile().exists()) {
-							uploadService.delete(Path.of(localRootFolder + item.getOriginalName()), 
-									remoteFolder, item.getOriginalName());
+							uploadService.delete(remoteFolder, item.getOriginalName());
 						}
 						continue;							
 					}
