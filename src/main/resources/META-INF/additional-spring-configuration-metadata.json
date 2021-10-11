@@ -1,0 +1,9 @@
+{
+	"properties": [
+		{
+			"name": "s3sync.use_trash_over_delete",
+			"type": "java.lang.Boolean",
+			"description": "Instead of delete folder or files, they're moved to .Trash/ reserved folder with the same tree"
+		}
+	]
+}

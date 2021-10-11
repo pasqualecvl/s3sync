@@ -1,4 +1,4 @@
-package it.pasqualecavallo.s3sync.controller.dto;
+package it.pasqualecavallo.s3sync.web.dto.request;
 
 import javax.validation.constraints.NotBlank;
 

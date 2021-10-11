@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.springframework.amqp.core.AmqpTemplate;
+import org.springframework.amqp.core.Message;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.mongodb.core.MongoOperations;
@@ -15,6 +16,8 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 
 import it.pasqualecavallo.s3sync.listener.SynchronizationMessageDto;
@@ -76,6 +79,7 @@ public class UploadService {
 				SynchronizationMessageDto dto = new SynchronizationMessageDto();
 				dto.setFile(relativePath);
 				dto.setRemoteFolder(remoteFolder);
+				dto.setSource(UserSpecificPropertiesManager.getProperty("client.alias"));
 				dto.setS3Action(isCreate ? S3Action.CREATE : S3Action.MODIFY);
 				amqpTemplate.convertAndSend(dto);
 			}
@@ -127,7 +131,14 @@ public class UploadService {
 		dto.setFile(relativePath);
 		dto.setRemoteFolder(remoteFolder);
 		dto.setS3Action(S3Action.DELETE);
-		amqpTemplate.convertAndSend(dto);
+		dto.setSource(UserSpecificPropertiesManager.getProperty("client.alias"));
+		Message message;
+		try {
+			message = new Message(new ObjectMapper().writeValueAsBytes(dto));
+			amqpTemplate.send(message);
+		} catch (JsonProcessingException e) {
+			e.printStackTrace();
+		}
 	}
 
 	public void deleteAsFolder(String remoteFolder, String relativeLocation) {

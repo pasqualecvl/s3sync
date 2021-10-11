@@ -5,7 +5,8 @@ import java.io.Serializable;
 public class SynchronizationMessageDto implements Serializable {
 
 	private static final long serialVersionUID = 204252542632494654L;
-
+	
+	private String source;
 	public String remoteFolder;
 	public String file;
 	public S3Action s3Action;
@@ -47,10 +48,19 @@ public class SynchronizationMessageDto implements Serializable {
 		CREATE, MODIFY, DELETE;
 	}
 
+	public String getSource() {
+		return source;
+	}
+	
+	public void setSource(String source) {
+		this.source = source;
+	}
+
 	@Override
 	public String toString() {
-		return "SynchronizationMessageDto [remoteFolder=" + remoteFolder + ", file=" + file + ", s3Action=" + s3Action
-				+ ", time=" + time + "]";
+		return "SynchronizationMessageDto [source=" + source + ", remoteFolder=" + remoteFolder + ", file=" + file
+				+ ", s3Action=" + s3Action + ", time=" + time + "]";
 	}
+	
 
 }
