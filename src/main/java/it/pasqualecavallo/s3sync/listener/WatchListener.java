@@ -79,6 +79,9 @@ public class WatchListener implements Runnable {
 		String listenerPath = watchable.toString();
 		String resourceName = event.context().toString();
 		String fullLocation = listenerPath + "/" + resourceName;
+		if(WatchListeners.checkForProgrammaticallyChange(localRootFolder, fullLocation.replaceFirst(localRootFolder, ""))) {
+			return;
+		}
 		Path fullPath = Path.of(fullLocation);
 		if (FileUtils.notMatchFilters(SynchronizationService.getExclusionPattern(localRootFolder), fullLocation)) {
 			switch (event.kind().name()) {
