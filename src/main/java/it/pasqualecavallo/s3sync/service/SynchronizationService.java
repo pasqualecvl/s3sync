@@ -28,6 +28,8 @@ import it.pasqualecavallo.s3sync.model.Item;
 import it.pasqualecavallo.s3sync.model.AttachedClient.SyncFolder;
 import it.pasqualecavallo.s3sync.utils.FileUtils;
 import it.pasqualecavallo.s3sync.utils.UserSpecificPropertiesManager;
+import it.pasqualecavallo.s3sync.web.controller.advice.exception.InternalServerErrorException;
+import it.pasqualecavallo.s3sync.web.dto.response.RestBaseResponse.ErrorMessage;
 
 /**
  * This service is responsible to synchronize local and remote data on startup.
@@ -83,7 +85,7 @@ public class SynchronizationService {
 			localToS3Sync(remoteFolder, localRootFolder);
 			s3toLocalSync(remoteFolder, localRootFolder);
 		} catch (IOException e) {
-			throw new RuntimeException("Exception synchronizing files", e);
+			throw new InternalServerErrorException(ErrorMessage.E500_SYNC_ERROR, "Unable to synchronize local and remote folders for: " + localRootFolder + " -> " + remoteFolder);
 		}
 
 	}

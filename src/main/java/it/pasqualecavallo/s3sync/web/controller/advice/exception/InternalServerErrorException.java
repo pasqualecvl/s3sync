@@ -4,12 +4,14 @@ import java.util.Arrays;
 
 import it.pasqualecavallo.s3sync.web.dto.response.RestBaseResponse.ErrorMessage;
 
-public class BadRequestException extends RuntimeException {
+public class InternalServerErrorException extends RuntimeException {
 	
+	private static final long serialVersionUID = 2188106414112072610L;
+
 	Iterable<String> placeholders;
 	ErrorMessage errorMessage;
 	
-	public BadRequestException(ErrorMessage errorMessage, String...placeholders) {
+	public InternalServerErrorException(ErrorMessage errorMessage, String...placeholders) {
 		this.placeholders = Arrays.asList(placeholders);
 		this.errorMessage = errorMessage;
 	}
@@ -29,5 +31,5 @@ public class BadRequestException extends RuntimeException {
 	public ErrorMessage getErrorMessage() {
 		return errorMessage;
 	}
-	
+
 }

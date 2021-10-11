@@ -27,7 +27,7 @@ public class RestBaseResponse {
 		return errorCode;
 	}
 	
-	public void setError(ErrorMessage errorMessage, String...placeholders) {
+	public void setError(ErrorMessage errorMessage, Iterable<String> placeholders) {
 		this.errorCode = errorMessage.name();
 		this.status = ResponseStatus.KO;
 		if(placeholders == null) {
@@ -42,7 +42,8 @@ public class RestBaseResponse {
 	}
 	
 	public enum ErrorMessage {
-		E400_BAD_REQUEST("Bad request: {}");
+		E400_BAD_REQUEST("Bad request: {}"), 
+		E500_SYNC_ERROR("Synchronization error: {}");
 	
 		private String value;
 		

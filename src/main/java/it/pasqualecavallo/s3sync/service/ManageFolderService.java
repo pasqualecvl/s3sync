@@ -12,6 +12,7 @@ import it.pasqualecavallo.s3sync.listener.WatchListeners;
 import it.pasqualecavallo.s3sync.model.AttachedClient;
 import it.pasqualecavallo.s3sync.model.AttachedClient.SyncFolder;
 import it.pasqualecavallo.s3sync.utils.UserSpecificPropertiesManager;
+import it.pasqualecavallo.s3sync.web.controller.advice.exception.BadRequestException;
 import it.pasqualecavallo.s3sync.web.dto.response.AddFolderResponse;
 import it.pasqualecavallo.s3sync.web.dto.response.RestBaseResponse.ErrorMessage;
 
@@ -43,10 +44,12 @@ public class ManageFolderService {
 			addToPersistence(client, localPath, remotePath);
 			synchronizationService.synchronize(remotePath, localPath);
 			startListenerThread(remotePath, localPath);
-			return new AddFolderResponse();
-		} else {
 			AddFolderResponse response = new AddFolderResponse();
-			response.setError(ErrorMessage.E400_BAD_REQUEST, "folder alredy in sync: " + foundFolder.getLocalPath());
+			response.setLocalFolder(localPath);
+			response.setRemoteFolder(remotePath);
+			return response;
+		} else {
+			throw new BadRequestException(ErrorMessage.E400_BAD_REQUEST, "Folder is alredy in sync");
 		}
 	}
 
