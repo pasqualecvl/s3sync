@@ -1,8 +1,10 @@
 package it.pasqualecavallo.s3sync.configuration;
 
+import org.springframework.amqp.core.AcknowledgeMode;
 import org.springframework.amqp.core.AmqpTemplate;
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
+import org.springframework.amqp.core.FanoutExchange;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
@@ -16,6 +18,7 @@ import org.springframework.context.annotation.Configuration;
 
 import it.pasqualecavallo.s3sync.listener.AmqpSyncListener;
 import it.pasqualecavallo.s3sync.utils.GlobalPropertiesManager;
+import it.pasqualecavallo.s3sync.utils.UserSpecificPropertiesManager;
 
 @Configuration
 public class MessageBrokerConfiguration {
@@ -31,17 +34,20 @@ public class MessageBrokerConfiguration {
 
 	@Bean
 	public Queue queue() {
-		return new Queue(GlobalPropertiesManager.getProperty("amqp.queue"), false);
+		return new Queue(GlobalPropertiesManager.getProperty("amqp.queue") + "_" +
+				UserSpecificPropertiesManager.getProperty("client.alias"), false, false, false, null);
 	}
 
 	@Bean
-	public TopicExchange topicExchange() {
-		return new TopicExchange(GlobalPropertiesManager.getProperty("amqp.notification_topic"));
+	public FanoutExchange fanoutExchange() {
+		return new FanoutExchange(GlobalPropertiesManager.getProperty("amqp.notification_topic"));
 	}
 
 	@Bean
-	public Binding binding(Queue queue, TopicExchange exchange) {
-		return BindingBuilder.bind(queue).to(exchange).with(GlobalPropertiesManager.getProperty("amqp.binding_key"));
+	public Binding binding() {
+		return BindingBuilder
+				.bind(queue())
+				.to(fanoutExchange());
 	}
 
 	@Bean
@@ -49,8 +55,10 @@ public class MessageBrokerConfiguration {
 			MessageListenerAdapter listenerAdapter) {
 		SimpleMessageListenerContainer container = new SimpleMessageListenerContainer();
 		container.setConnectionFactory(connectionFactory);
-		container.setQueueNames(GlobalPropertiesManager.getProperty("amqp.queue"));
+		container.setQueueNames(GlobalPropertiesManager.getProperty("amqp.queue") + "_" +
+				UserSpecificPropertiesManager.getProperty("client.alias"));
 		container.setMessageListener(listenerAdapter);
+		//Scontainer.setAcknowledgeMode(AcknowledgeMode.NONE);
 		return container;
 	}
 	
@@ -63,8 +71,6 @@ public class MessageBrokerConfiguration {
 	public AmqpTemplate amqpTemplate() {
 		RabbitTemplate template = new RabbitTemplate(connectionFactory());
 		template.setExchange(GlobalPropertiesManager.getProperty("amqp.notification_topic"));
-		template.setDefaultReceiveQueue(GlobalPropertiesManager.getProperty("amqp.queue"));
-		template.setRoutingKey(GlobalPropertiesManager.getProperty("amqp.binding_key"));
 		return template;
 	}
 

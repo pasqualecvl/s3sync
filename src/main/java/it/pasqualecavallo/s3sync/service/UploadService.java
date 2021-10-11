@@ -132,13 +132,7 @@ public class UploadService {
 		dto.setRemoteFolder(remoteFolder);
 		dto.setS3Action(S3Action.DELETE);
 		dto.setSource(UserSpecificPropertiesManager.getProperty("client.alias"));
-		Message message;
-		try {
-			message = new Message(new ObjectMapper().writeValueAsBytes(dto));
-			amqpTemplate.send(message);
-		} catch (JsonProcessingException e) {
-			e.printStackTrace();
-		}
+		amqpTemplate.convertAndSend(dto);
 	}
 
 	public void deleteAsFolder(String remoteFolder, String relativeLocation) {
