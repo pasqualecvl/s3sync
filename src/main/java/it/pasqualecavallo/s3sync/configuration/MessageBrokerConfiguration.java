@@ -19,7 +19,7 @@ public class MessageBrokerConfiguration {
 
 	@Bean
 	public ConnectionFactory connectionFactory() {
-		CachingConnectionFactory connectionFactory = new CachingConnectionFactory(GlobalPropertiesManager.getProperty("ampq.url"));
+		CachingConnectionFactory connectionFactory = new CachingConnectionFactory(GlobalPropertiesManager.getProperty("amqp.url"));
 		connectionFactory.setUsername(GlobalPropertiesManager.getProperty("amqp.user"));
 		connectionFactory.setPassword(GlobalPropertiesManager.getProperty("amqp.password"));
 		connectionFactory.setVirtualHost(GlobalPropertiesManager.getProperty("amqp.vhost"));

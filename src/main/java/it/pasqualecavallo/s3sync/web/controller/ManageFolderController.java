@@ -1,4 +1,4 @@
-package it.pasqualecavallo.s3sync.controller;
+package it.pasqualecavallo.s3sync.web.controller;
 
 import javax.validation.Valid;
 
@@ -7,8 +7,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-import it.pasqualecavallo.s3sync.controller.dto.AddFolderRequest;
 import it.pasqualecavallo.s3sync.service.ManageFolderService;
+import it.pasqualecavallo.s3sync.web.dto.request.AddFolderRequest;
+import it.pasqualecavallo.s3sync.web.dto.response.AddFolderResponse;
 
 @RestController
 public class ManageFolderController {
@@ -17,8 +18,8 @@ public class ManageFolderController {
 	private ManageFolderService manageFolderService;
 	
 	@PostMapping(value = "/api/folder/add")
-	public void addFolder(@RequestBody @Valid AddFolderRequest addFolderRequest) {
-		manageFolderService.addFolder(addFolderRequest.getLocalFolder(), addFolderRequest.getRemoteFolder());
+	public AddFolderResponse addFolder(@RequestBody @Valid AddFolderRequest addFolderRequest) {
+		return manageFolderService.addFolder(addFolderRequest.getLocalFolder(), addFolderRequest.getRemoteFolder());
 	}
 	
 }

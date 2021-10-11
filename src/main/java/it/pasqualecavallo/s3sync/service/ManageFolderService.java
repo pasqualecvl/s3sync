@@ -1,7 +1,6 @@
 package it.pasqualecavallo.s3sync.service;
 
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoOperations;
@@ -13,6 +12,8 @@ import it.pasqualecavallo.s3sync.listener.WatchListeners;
 import it.pasqualecavallo.s3sync.model.AttachedClient;
 import it.pasqualecavallo.s3sync.model.AttachedClient.SyncFolder;
 import it.pasqualecavallo.s3sync.utils.UserSpecificPropertiesManager;
+import it.pasqualecavallo.s3sync.web.dto.response.AddFolderResponse;
+import it.pasqualecavallo.s3sync.web.dto.response.RestBaseResponse.ErrorMessage;
 
 @Service
 public class ManageFolderService {
@@ -26,21 +27,26 @@ public class ManageFolderService {
 	@Autowired
 	private UploadService uploadService;
 	
-	public void addFolder(String localPath, String remotePath) {
+	public AddFolderResponse addFolder(String localPath, String remotePath) {
 		String clientAlias = UserSpecificPropertiesManager.getProperty("client.alias");
 		AttachedClient client = mongoOperations.findOne(new Query(Criteria.where("alias").is(clientAlias)),
 				AttachedClient.class);
 		List<SyncFolder> folders = client.getSyncFolder();
-		AtomicBoolean found = new AtomicBoolean(false);
-		folders.stream().forEach(item -> {
-			if (item.getLocalPath().equals(localPath)) {
-				found.set(true);
-			}
-		});
-		if (!found.get()) {
+		SyncFolder foundFolder = null;
+		for(SyncFolder folder : folders) {
+			if (folder.getLocalPath().startsWith(localPath)) {
+				foundFolder = folder;
+				break;
+			}			
+		}
+		if (foundFolder == null) {
 			addToPersistence(client, localPath, remotePath);
 			synchronizationService.synchronize(remotePath, localPath);
 			startListenerThread(remotePath, localPath);
+			return new AddFolderResponse();
+		} else {
+			AddFolderResponse response = new AddFolderResponse();
+			response.setError(ErrorMessage.E400_BAD_REQUEST, "folder alredy in sync: " + foundFolder.getLocalPath());
 		}
 	}
 
