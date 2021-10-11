@@ -90,16 +90,14 @@ public class UploadService {
 	}
 
 	public void upload(Path path, String remoteFolder, String relativePath) {
-		Item item = mongoOperations.findOne(
-				new Query(Criteria.where("ownedByFolder").is(remoteFolder).and("originalName").is(relativePath)),
+		Item item = mongoOperations.findOne(new Query(Criteria.where("ownedByFolder").is(remoteFolder).and("originalName").is(relativePath)),
 				Item.class);
 		upload(path, relativePath, remoteFolder, item);
 
 	}
 
 	public void getOrUpdate(String localFullPathFolder, String remoteFullPathFolder) {
-		System.out.println(
-				"Fetch or update file: " + localFullPathFolder + " from remote folder " + remoteFullPathFolder);
+		System.out.println("Fetch or update file: " + localFullPathFolder + " from remote folder " + remoteFullPathFolder);
 		GetObjectRequest request = GetObjectRequest.builder().bucket(GlobalPropertiesManager.getProperty("s3.bucket"))
 				.key(remoteFullPathFolder).build();
 		ResponseInputStream<GetObjectResponse> response = s3Client.getObject(request);
@@ -136,7 +134,9 @@ public class UploadService {
 	}
 
 	public void deleteAsFolder(String remoteFolder, String relativeLocation) {
-		List<Item> toDelete = mongoOperations.find(new Query(Criteria.where("ownedByFolder").is(remoteFolder).and("originalName").regex("/^"+relativeLocation+"/")), Item.class);
+		List<Item> toDelete = mongoOperations.find(
+				new Query(
+						Criteria.where("ownedByFolder").is(remoteFolder).and("originalName").regex("/^"+relativeLocation+"/")), Item.class);
 		toDelete.forEach(item -> {
 			delete(item.getOwnedByFolder(), item.getOriginalName());
 		});
