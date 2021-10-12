@@ -27,13 +27,16 @@ public class AmqpSyncListener {
 	
 	@Autowired
 	private UploadService uploadService;
+	
+	@Autowired
+	private SynchronizationService synchronizationService;
 
 	public void receiveSyncMessage(SynchronizationMessageDto dto) {
 		WatchListeners.lockSemaphore();
 		logger.debug("Locking WatchListeners");
 		try {
 			if(!dto.getSource().equals(UserSpecificPropertiesManager.getProperty("client.alias"))) {
-				String localFolder = SynchronizationService
+				String localFolder = synchronizationService
 						.getSynchronizedLocalRootFolderByRemoteFolder(dto.getRemoteFolder());
 				if(localFolder != null) {
 					WatchListeners.putChangesWhileLocked(localFolder, dto.getFile());

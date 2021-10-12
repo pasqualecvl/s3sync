@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import it.pasqualecavallo.s3sync.service.SynchronizationService;
 import it.pasqualecavallo.s3sync.service.UploadService;
 
 public class WatchListeners {
@@ -17,8 +18,9 @@ public class WatchListeners {
 	
 	private static volatile int threadSemaphore = 0;
 	
-	public static void startThread(UploadService uploadService, String remoteFolder, String localRootFolder) {
-		WatchListener listener = new WatchListener(uploadService, remoteFolder, localRootFolder);
+	public static void startThread(UploadService uploadService, SynchronizationService synchronizationService,
+			String remoteFolder, String localRootFolder) {
+		WatchListener listener = new WatchListener(uploadService, synchronizationService, remoteFolder, localRootFolder);
 		Thread thread = new Thread(listener);
 		thread.start();
 		threadPool.put(localRootFolder, thread);

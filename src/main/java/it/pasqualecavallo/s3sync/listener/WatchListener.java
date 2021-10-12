@@ -28,13 +28,16 @@ public class WatchListener implements Runnable {
 	private String remoteFolder;
 	private String localRootFolder;
 	private WatchService watchService;
-
+	private SynchronizationService synchronizationService;
+	
 	private Map<String, WatchKey> watchKeys = new HashMap<>();
 
-	public WatchListener(UploadService uploadService, String remoteFolder, String localRootFolder) {
+	public WatchListener(UploadService uploadService, SynchronizationService synchronizationService,
+			String remoteFolder, String localRootFolder) {
 		this.uploadService = uploadService;
 		this.remoteFolder = remoteFolder;
 		this.localRootFolder = localRootFolder;
+		this.synchronizationService = synchronizationService;
 	}
 
 	@Override
@@ -83,7 +86,7 @@ public class WatchListener implements Runnable {
 			return;
 		}
 		Path fullPath = Path.of(fullLocation);
-		if (FileUtils.notMatchFilters(SynchronizationService.getExclusionPattern(localRootFolder), fullLocation)) {
+		if (FileUtils.notMatchFilters(synchronizationService.getExclusionPattern(localRootFolder), fullLocation)) {
 			switch (event.kind().name()) {
 			case "ENTRY_CREATE":
 				if (fullPath.toFile().isDirectory()) {

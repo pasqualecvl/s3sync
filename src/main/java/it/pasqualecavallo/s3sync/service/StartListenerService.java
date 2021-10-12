@@ -26,6 +26,9 @@ public class StartListenerService {
 	@Autowired
 	private UploadService uploadService;
 	
+	@Autowired
+	private SynchronizationService synchronizationService;
+	
 	@PostConstruct
 	public void startListeners() {
 		String clientAlias = UserSpecificPropertiesManager.getProperty("client.alias");
@@ -41,7 +44,7 @@ public class StartListenerService {
 		} else {
 			List<SyncFolder> syncFolders = client.getSyncFolder();
 			for(SyncFolder folder : syncFolders) {
-				WatchListeners.startThread(uploadService, folder.getRemotePath(), folder.getLocalPath());
+				WatchListeners.startThread(uploadService, synchronizationService, folder.getRemotePath(), folder.getLocalPath());
 			}
 		}
 	}

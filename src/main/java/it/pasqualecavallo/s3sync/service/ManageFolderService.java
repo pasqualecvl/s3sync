@@ -1,5 +1,6 @@
 package it.pasqualecavallo.s3sync.service;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,8 +14,13 @@ import it.pasqualecavallo.s3sync.model.AttachedClient;
 import it.pasqualecavallo.s3sync.model.AttachedClient.SyncFolder;
 import it.pasqualecavallo.s3sync.utils.UserSpecificPropertiesManager;
 import it.pasqualecavallo.s3sync.web.controller.advice.exception.BadRequestException;
+import it.pasqualecavallo.s3sync.web.controller.advice.exception.InternalServerErrorException;
+import it.pasqualecavallo.s3sync.web.dto.response.AddExclusionPatterResponse;
 import it.pasqualecavallo.s3sync.web.dto.response.AddFolderResponse;
+import it.pasqualecavallo.s3sync.web.dto.response.ListSyncFoldersResponse;
+import it.pasqualecavallo.s3sync.web.dto.response.RemoveFolderResponse;
 import it.pasqualecavallo.s3sync.web.dto.response.RestBaseResponse.ErrorMessage;
+import it.pasqualecavallo.s3sync.web.dto.response.SyncFolderResponse;
 
 @Service
 public class ManageFolderService {
@@ -24,21 +30,21 @@ public class ManageFolderService {
 
 	@Autowired
 	private SynchronizationService synchronizationService;
-	
+
 	@Autowired
 	private UploadService uploadService;
-	
+
 	public AddFolderResponse addFolder(String localPath, String remotePath) {
 		String clientAlias = UserSpecificPropertiesManager.getProperty("client.alias");
 		AttachedClient client = mongoOperations.findOne(new Query(Criteria.where("alias").is(clientAlias)),
 				AttachedClient.class);
 		List<SyncFolder> folders = client.getSyncFolder();
 		SyncFolder foundFolder = null;
-		for(SyncFolder folder : folders) {
-			if (folder.getLocalPath().startsWith(localPath)) {
+		for (SyncFolder folder : folders) {
+			if (folder.getLocalPath().equals(localPath) || folder.getLocalPath().startsWith(localPath + "/")) {
 				foundFolder = folder;
 				break;
-			}			
+			}
 		}
 		if (foundFolder == null) {
 			addToPersistence(client, localPath, remotePath);
@@ -62,6 +68,58 @@ public class ManageFolderService {
 	}
 
 	private void startListenerThread(String remoteFolder, String localRootFolder) {
-		WatchListeners.startThread(uploadService, remoteFolder, localRootFolder);
+		WatchListeners.startThread(uploadService, synchronizationService, remoteFolder, localRootFolder);
+	}
+
+	public ListSyncFoldersResponse listFolders(Integer page, Integer pageSize) {
+		String clientAlias = UserSpecificPropertiesManager.getProperty("client.alias");
+		AttachedClient client = mongoOperations.findOne(new Query(Criteria.where("alias").is(clientAlias)),
+				AttachedClient.class);
+		ListSyncFoldersResponse response = new ListSyncFoldersResponse();
+		List<SyncFolderResponse> responseList = new ArrayList<>();
+		List<SyncFolder> syncFolders = client.getSyncFolder();
+		List<SyncFolder> subSyncFolders = new ArrayList<>();
+		int listSize = syncFolders != null ? syncFolders.size() : 0;
+		if (listSize != 0 && page < (int) Math.ceil((double) listSize / (double) pageSize)) {
+			if (listSize > ((page + 1) * pageSize)) {
+				subSyncFolders = syncFolders.subList(pageSize * page, pageSize * (page + 1));
+			} else {
+				subSyncFolders = syncFolders.subList(pageSize * page, listSize);
+			}
+		}
+
+		for (SyncFolder folder : subSyncFolders) {
+			SyncFolderResponse responseItem = new SyncFolderResponse();
+			responseItem.setLocalFolder(folder.getLocalPath());
+			responseItem.setRemoteFolder(folder.getRemotePath());
+			responseItem.setExclusionPatterns(folder.getExclusionPattern());
+			responseList.add(responseItem);
+		}
+		response.setList(responseList);
+		return response;
+	}
+
+	public RemoveFolderResponse removeFolder(String remoteFolder) {
+		String localFolder = synchronizationService.getSynchronizedLocalRootFolderByRemoteFolder(remoteFolder);
+		if(localFolder != null) {
+			synchronizationService.removeSynchronizationFolder(localFolder);			
+			return new RemoveFolderResponse();
+		} else {
+			throw new InternalServerErrorException(ErrorMessage.E500_GENERIC_ERROR);
+		}
+	}
+
+	public AddExclusionPatterResponse addExclusionPattern(String regexp, String remoteFolder) {
+		String localFolder = synchronizationService.getSynchronizedLocalRootFolderByRemoteFolder(remoteFolder);
+		if(localFolder != null) {
+			List<String> patterns = synchronizationService.addSynchronizationExclusionPattern(localFolder, regexp);
+			AddExclusionPatterResponse response = new AddExclusionPatterResponse();
+			response.setPatterns(patterns);
+			response.setLocalFolder(localFolder);
+			response.setRemoteFolder(remoteFolder);
+			return response;
+		} else {
+			throw new InternalServerErrorException(ErrorMessage.E500_GENERIC_ERROR);
+		}		
 	}
 }

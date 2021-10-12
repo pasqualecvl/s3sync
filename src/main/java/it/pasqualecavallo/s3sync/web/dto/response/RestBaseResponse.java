@@ -43,7 +43,8 @@ public class RestBaseResponse {
 	
 	public enum ErrorMessage {
 		E400_BAD_REQUEST("Bad request: {}"), 
-		E500_SYNC_ERROR("Synchronization error: {}");
+		E500_SYNC_ERROR("Synchronization error: {}"),
+		E500_GENERIC_ERROR("Generic technical error");
 	
 		private String value;
 		

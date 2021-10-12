@@ -24,8 +24,8 @@ import org.springframework.stereotype.Service;
 
 import it.pasqualecavallo.s3sync.listener.WatchListeners;
 import it.pasqualecavallo.s3sync.model.AttachedClient;
-import it.pasqualecavallo.s3sync.model.Item;
 import it.pasqualecavallo.s3sync.model.AttachedClient.SyncFolder;
+import it.pasqualecavallo.s3sync.model.Item;
 import it.pasqualecavallo.s3sync.utils.FileUtils;
 import it.pasqualecavallo.s3sync.utils.UserSpecificPropertiesManager;
 import it.pasqualecavallo.s3sync.web.controller.advice.exception.InternalServerErrorException;
@@ -50,7 +50,7 @@ public class SynchronizationService {
 	private static volatile Map<String, List<Pattern>> exclusionPatterns = new HashMap<>();
 
 	@PostConstruct
-	public void synchronizeOnStartup() {
+	private void synchronizeOnStartup() {
 		WatchListeners.lockSemaphore();
 		try {
 			AttachedClient client = mongoOperations.findOne(
@@ -69,10 +69,10 @@ public class SynchronizationService {
 							: new ArrayList<>());
 				}
 			});
-			if(client.getClientConfiguration().isRunSynchronizationOnStartup()) {
+			if (client.getClientConfiguration().isRunSynchronizationOnStartup()) {
 				client.getSyncFolder().forEach(folder -> {
 					synchronize(folder.getRemotePath(), folder.getLocalPath());
-				});				
+				});
 			}
 		} finally {
 			WatchListeners.releaseSemaphore();
@@ -85,7 +85,8 @@ public class SynchronizationService {
 			localToS3Sync(remoteFolder, localRootFolder);
 			s3toLocalSync(remoteFolder, localRootFolder);
 		} catch (IOException e) {
-			throw new InternalServerErrorException(ErrorMessage.E500_SYNC_ERROR, "Unable to synchronize local and remote folders for: " + localRootFolder + " -> " + remoteFolder);
+			throw new InternalServerErrorException(ErrorMessage.E500_SYNC_ERROR,
+					"Unable to synchronize local and remote folders for: " + localRootFolder + " -> " + remoteFolder);
 		}
 
 	}
@@ -96,8 +97,8 @@ public class SynchronizationService {
 		Map<String, Item> mapItems = items.stream().collect(Collectors.toMap(Item::getOriginalName, Item::get));
 		Files.walk(Paths.get(localRootFolder)).forEach(path -> {
 			File file = path.toFile();
-			if (file.isFile() && file.canRead()
-					&& FileUtils.notMatchFilters(exclusionPatterns.get(localRootFolder), path.toString().replaceFirst(localRootFolder, ""))) {
+			if (file.isFile() && file.canRead() && FileUtils.notMatchFilters(exclusionPatterns.get(localRootFolder),
+					path.toString().replaceFirst(localRootFolder, ""))) {
 				// FIXME: apply regex filters here
 				String relativePath = file.getAbsolutePath().replaceFirst(localRootFolder, "");
 				if (!mapItems.containsKey(relativePath) || (mapItems.containsKey(relativePath)
@@ -128,11 +129,11 @@ public class SynchronizationService {
 					}
 				} else {
 					if (item.getUploadedBy().equals(UserSpecificPropertiesManager.getProperty("client.alias"))) {
-						//deleted items -> uploaded by current user but not found on local machine
-						if(!Path.of(localRootFolder + item.getOriginalName()).toFile().exists()) {
+						// deleted items -> uploaded by current user but not found on local machine
+						if (!Path.of(localRootFolder + item.getOriginalName()).toFile().exists()) {
 							uploadService.delete(remoteFolder, item.getOriginalName());
 						}
-						continue;							
+						continue;
 					}
 					// check for file exists
 					// FIXME: apply regex filters here
@@ -168,6 +169,7 @@ public class SynchronizationService {
 		synchronized (synchronizedFolder) {
 			synchronizedFolder.remove(localRootFolder);
 		}
+		WatchListeners.stopThread(localRootFolder);
 		AttachedClient client = mongoOperations.findOne(
 				new Query(Criteria.where("alias").is(UserSpecificPropertiesManager.getProperty("client.alias"))),
 				AttachedClient.class);
@@ -185,7 +187,7 @@ public class SynchronizationService {
 		return synchronizedFolder.get(localRootFolder);
 	}
 
-	public static String getSynchronizedLocalRootFolderByRemoteFolder(String remoteFolder) {
+	public String getSynchronizedLocalRootFolderByRemoteFolder(String remoteFolder) {
 		for (Entry<String, String> entry : synchronizedFolder.entrySet()) {
 			if (entry.getValue().equals(remoteFolder)) {
 				return entry.getKey();
@@ -194,8 +196,28 @@ public class SynchronizationService {
 		return null;
 	}
 
-	public static List<Pattern> getExclusionPattern(String rootLocalFolder) {
+	public List<Pattern> getExclusionPattern(String rootLocalFolder) {
 		return exclusionPatterns.get(rootLocalFolder);
+	}
+
+	public List<String> addSynchronizationExclusionPattern(String localFolder, String regexp) {
+		List<String> toReturn = new ArrayList<>();
+		List<Pattern> patterns = exclusionPatterns.get(localFolder);
+		boolean present = false;
+		for (Pattern pattern : patterns) {
+			String patternString = pattern.toString();
+			toReturn.add(patternString);
+			if (pattern.toString().equals(regexp)) {
+				present = true;
+			}
+		}
+		synchronized (exclusionPatterns) {
+			if (!present) {
+				toReturn.add(regexp);
+				patterns.add(Pattern.compile(regexp));
+			}
+		}
+		return toReturn;
 	}
 
 }
