@@ -36,6 +36,7 @@ public class AmqpSyncListener {
 				String localFolder = SynchronizationService
 						.getSynchronizedLocalRootFolderByRemoteFolder(dto.getRemoteFolder());
 				if(localFolder != null) {
+					WatchListeners.putChangesWhileLocked(localFolder, dto.getFile());
 					logger.debug("Serving action: " + dto.toString());
 					if (S3Action.CREATE.equals(dto.getS3Action()) || S3Action.MODIFY.equals(dto.getS3Action())) {
 						uploadService.getOrUpdate(localFolder + dto.getFile(), dto.getRemoteFolder() + dto.getFile());

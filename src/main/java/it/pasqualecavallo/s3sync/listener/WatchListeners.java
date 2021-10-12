@@ -1,13 +1,11 @@
 package it.pasqualecavallo.s3sync.listener;
 
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-
-import javax.swing.text.ChangedCharSetException;
 
 import it.pasqualecavallo.s3sync.service.UploadService;
 
@@ -15,7 +13,7 @@ public class WatchListeners {
 	
 	private static Map<String, Thread> threadPool = new HashMap<>();
 	
-	private static volatile Map<String, List<String>> changesWhileLocked = new HashMap<>();
+	private static volatile Map<String, Collection<String>> changesWhileLocked = new HashMap<>();
 	
 	private static volatile int threadSemaphore = 0;
 	
@@ -60,13 +58,16 @@ public class WatchListeners {
 	public static void putChangesWhileLocked(String syncFolder, String file) {
 		synchronized (changesWhileLocked) {
 			if(changesWhileLocked.containsKey(syncFolder)) {
-				if(changesWhileLocked.get(syncFolder) == null || changesWhileLocked.get(syncFolder).isEmpty()) {
-					changesWhileLocked.put(syncFolder, Arrays.asList(syncFolder));
-				} else {
-					changesWhileLocked.get(syncFolder).add(file);
+				Collection<String> fileForFolder = changesWhileLocked.get(syncFolder);
+				if(fileForFolder == null) {
+					fileForFolder = Collections.synchronizedCollection(new ArrayList<>());
 				}
+				fileForFolder.add(file);
+				changesWhileLocked.put(syncFolder, fileForFolder);
 			} else {
-				changesWhileLocked.put(syncFolder, Arrays.asList(file));
+				Collection<String> fileForFolder = Collections.synchronizedCollection(new ArrayList<>());
+				fileForFolder.add(file);
+				changesWhileLocked.put(syncFolder, fileForFolder);
 			}			
 		}
 	}

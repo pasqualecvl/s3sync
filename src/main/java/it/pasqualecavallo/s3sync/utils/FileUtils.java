@@ -13,6 +13,8 @@ import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import it.pasqualecavallo.s3sync.listener.WatchListeners;
+
 public class FileUtils {
 
 	private static final Logger logger = LoggerFactory.getLogger(FileUtils.class);
