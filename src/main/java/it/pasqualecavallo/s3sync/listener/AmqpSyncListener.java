@@ -40,7 +40,7 @@ public class AmqpSyncListener {
 					logger.debug("Serving action: " + dto.toString());
 					if (S3Action.CREATE.equals(dto.getS3Action()) || S3Action.MODIFY.equals(dto.getS3Action())) {
 						uploadService.getOrUpdate(localFolder + dto.getFile(), dto.getRemoteFolder() + dto.getFile());
-					} else if (S3Action.DELETE.name().equals(dto.getS3Action())) {
+					} else if (S3Action.DELETE.equals(dto.getS3Action())) {
 						long localFileLastModified = Path.of(localFolder + dto.getFile()).toFile().lastModified();
 						if (localFileLastModified <= dto.getTime()) {
 							FileUtils.deleteFileAndEmptyTree(localFolder + dto.getFile());
