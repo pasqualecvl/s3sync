@@ -6,13 +6,20 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class FileUtils {
 
+	private static final Logger logger = LoggerFactory.getLogger(FileUtils.class);
+	
 	public static void createFileTree(String fullPath, byte[] content) throws IOException {
 		String[] tokenized = tokenize(fullPath);
+		logger.trace("Tokenizing string: " + fullPath + " returns with " + Arrays.toString(tokenized));
 		if (tokenized.length > 1) {
 			int index = 0;
 			for (; index < tokenized.length - 1; index++) {
@@ -26,6 +33,8 @@ public class FileUtils {
 					}
 				}
 			}
+		} else {
+			logger.debug("Tokenization returns with one token, which is the file name. Write the content to /" + fullPath);
 		}
 		try (FileOutputStream fos = new FileOutputStream(fullPath)) {
 			  fos.write(content);
