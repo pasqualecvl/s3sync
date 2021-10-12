@@ -2,6 +2,8 @@ package it.pasqualecavallo.s3sync.listener;
 
 import java.nio.file.Path;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
@@ -21,25 +23,33 @@ public class AmqpSyncListener {
 	@Qualifier("sqsJsonMapper")
 	private JsonMapper jsonMapper;
 
+	private static final Logger logger = LoggerFactory.getLogger(AmqpSyncListener.class);
+	
 	@Autowired
 	private UploadService uploadService;
 
 	public void receiveSyncMessage(SynchronizationMessageDto dto) {
 		WatchListeners.lockSemaphore();
+		logger.debug("Locking WatchListeners");
 		try {
-//			SynchronizationMessageDto dto = jsonMapper.readValue(message, SynchronizationMessageDto.class);
 			if(!dto.getSource().equals(UserSpecificPropertiesManager.getProperty("client.alias"))) {
 				String localFolder = SynchronizationService
 						.getSynchronizedLocalRootFolderByRemoteFolder(dto.getRemoteFolder());
 				if(localFolder != null) {
+					logger.debug("Serving action: " + dto.toString());
 					if (S3Action.CREATE.equals(dto.getS3Action()) || S3Action.MODIFY.equals(dto.getS3Action())) {
 						uploadService.getOrUpdate(localFolder + dto.getFile(), dto.getRemoteFolder() + dto.getFile());
 					} else if (S3Action.DELETE.name().equals(dto.getS3Action())) {
-						if (Path.of(localFolder + dto.getFile()).toFile().lastModified() <= dto.getTime()) {
+						long localFileLastModified = Path.of(localFolder + dto.getFile()).toFile().lastModified();
+						if (localFileLastModified <= dto.getTime()) {
 							FileUtils.deleteFileAndEmptyTree(localFolder + dto.getFile());
+						} else {
+							logger.debug("Local file is newer than the remote one: " + localFileLastModified + " -> " + dto.getTime());
 						}
 					}
 				}				
+			} else {
+				logger.debug("Consuming AMQP message made by this client -> discarded");
 			}
 		} finally {
 			WatchListeners.releaseSemaphore();
