@@ -26,35 +26,5 @@ public class AwsSaasConfiguration {
 										GlobalPropertiesManager.getProperty("s3.access_secret"))
 				)).build();
 	}
-	
-	/*
-	@Bean
-	public DynamoDbClient dynamoClient() {
-		return DynamoDbClient.builder().
-				region(Region.of(PropertiesManager.getProperty("dynamo.region")))
-				.credentialsProvider(
-						StaticCredentialsProvider.create(
-								AwsBasicCredentials.create(
-										PropertiesManager.getProperty("dynamo.access_key"),
-										PropertiesManager.getProperty("dynamo.access_secret"))
-				)).build();
-				
-	}
-	
-	@Bean
-	public SqsClient sqsClient() {
-		return SqsClient.builder()
-			.region(Region.of(GlobalPropertiesManager.getProperty("sqs.region")))
-			.credentialsProvider(
-					StaticCredentialsProvider.create(
-							AwsBasicCredentials.create(
-									GlobalPropertiesManager.getProperty("sqs.access_key"),
-									GlobalPropertiesManager.getProperty("sqs.access_secret"))
-							)
-					)
-			.build();
-	}
-	
-	*/
 
 }
