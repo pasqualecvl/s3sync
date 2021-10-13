@@ -13,10 +13,12 @@ import org.springframework.web.bind.annotation.RestController;
 import it.pasqualecavallo.s3sync.service.ManageFolderService;
 import it.pasqualecavallo.s3sync.web.dto.request.AddExclusionPatterRequest;
 import it.pasqualecavallo.s3sync.web.dto.request.AddFolderRequest;
+import it.pasqualecavallo.s3sync.web.dto.request.RemoveExclusionPatterRequest;
 import it.pasqualecavallo.s3sync.web.dto.request.RemoveFolderRequest;
 import it.pasqualecavallo.s3sync.web.dto.response.AddExclusionPatterResponse;
 import it.pasqualecavallo.s3sync.web.dto.response.AddFolderResponse;
 import it.pasqualecavallo.s3sync.web.dto.response.ListSyncFoldersResponse;
+import it.pasqualecavallo.s3sync.web.dto.response.RemoveExclusionPatterResponse;
 import it.pasqualecavallo.s3sync.web.dto.response.RemoveFolderResponse;
 
 @RestController
@@ -43,6 +45,11 @@ public class ManageFolderController {
 	@PostMapping(value = "/api/folder/add/exclusion_pattern")
 	public AddExclusionPatterResponse addExclusionPattern(@RequestBody @Valid AddExclusionPatterRequest addExclusionPatter) {
 		return manageFolderService.addExclusionPattern(addExclusionPatter.getRegexp(), addExclusionPatter.getRemoteFolder());
+	}
+
+	@DeleteMapping(value = "/api/folder/remove/exclusion_pattern")
+	public RemoveExclusionPatterResponse removeExclusionPattern(@RequestBody @Valid RemoveExclusionPatterRequest removeExclusionPatter) {
+		return manageFolderService.removeExclusionPattern(removeExclusionPatter.getRegExp(), removeExclusionPatter.getRemoteFolder());
 	}
 
 }

@@ -18,6 +18,7 @@ import it.pasqualecavallo.s3sync.web.controller.advice.exception.InternalServerE
 import it.pasqualecavallo.s3sync.web.dto.response.AddExclusionPatterResponse;
 import it.pasqualecavallo.s3sync.web.dto.response.AddFolderResponse;
 import it.pasqualecavallo.s3sync.web.dto.response.ListSyncFoldersResponse;
+import it.pasqualecavallo.s3sync.web.dto.response.RemoveExclusionPatterResponse;
 import it.pasqualecavallo.s3sync.web.dto.response.RemoveFolderResponse;
 import it.pasqualecavallo.s3sync.web.dto.response.RestBaseResponse.ErrorMessage;
 import it.pasqualecavallo.s3sync.web.dto.response.SyncFolderResponse;
@@ -122,4 +123,17 @@ public class ManageFolderService {
 			throw new InternalServerErrorException(ErrorMessage.E500_GENERIC_ERROR);
 		}		
 	}
+
+	public RemoveExclusionPatterResponse removeExclusionPattern(String regExp, String remoteFolder) {
+		String localFolder = synchronizationService.getSynchronizedLocalRootFolderByRemoteFolder(remoteFolder);
+		if(localFolder != null) {
+			List<String> patterns = synchronizationService.removeSynchronizationExclusionPattern(localFolder, regExp);
+			RemoveExclusionPatterResponse response = new RemoveExclusionPatterResponse();
+			response.setExclusionPatterns(patterns);
+			return response;
+		} else {
+			throw new InternalServerErrorException(ErrorMessage.E500_GENERIC_ERROR);
+		}		
+	}
+	
 }

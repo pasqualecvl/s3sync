@@ -219,5 +219,25 @@ public class SynchronizationService {
 		}
 		return toReturn;
 	}
+	
+	public List<String> removeSynchronizationExclusionPattern(String localFolder, String regexp) {
+		List<String> toReturn = new ArrayList<>();
+		List<Pattern> patterns = exclusionPatterns.get(localFolder);
+		Pattern foundPattern = null;
+		for (Pattern pattern : patterns) {
+			String patternString = pattern.toString();
+			if (pattern.toString().equals(regexp)) {
+				foundPattern = pattern;
+			} else {
+				toReturn.add(patternString);
+			}
+		}
+		synchronized (exclusionPatterns) {
+			if (foundPattern != null) {
+				patterns.remove(foundPattern);
+			}
+		}
+		return toReturn;		
+	}
 
 }
