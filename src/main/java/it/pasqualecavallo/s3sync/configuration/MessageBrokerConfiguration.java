@@ -55,7 +55,6 @@ public class MessageBrokerConfiguration {
 		container.setQueueNames(GlobalPropertiesManager.getProperty("amqp.queue") + "_" +
 				UserSpecificPropertiesManager.getProperty("client.alias"));
 		container.setMessageListener(listenerAdapter);
-		//Scontainer.setAcknowledgeMode(AcknowledgeMode.NONE);
 		return container;
 	}
 	
