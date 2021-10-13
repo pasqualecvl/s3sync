@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import it.pasqualecavallo.s3sync.service.ManageFolderService;
-import it.pasqualecavallo.s3sync.web.dto.request.AddExclusionPatterRequest;
+import it.pasqualecavallo.s3sync.web.dto.request.AddExclusionPatternRequest;
 import it.pasqualecavallo.s3sync.web.dto.request.AddFolderRequest;
 import it.pasqualecavallo.s3sync.web.dto.request.RemoveExclusionPatterRequest;
 import it.pasqualecavallo.s3sync.web.dto.request.RemoveFolderRequest;
@@ -43,7 +43,7 @@ public class ManageFolderController {
 	}
 
 	@PostMapping(value = "/api/folder/add/exclusion_pattern")
-	public AddExclusionPatterResponse addExclusionPattern(@RequestBody @Valid AddExclusionPatterRequest addExclusionPatter) {
+	public AddExclusionPatterResponse addExclusionPattern(@RequestBody @Valid AddExclusionPatternRequest addExclusionPatter) {
 		return manageFolderService.addExclusionPattern(addExclusionPatter.getRegexp(), addExclusionPatter.getRemoteFolder());
 	}
 

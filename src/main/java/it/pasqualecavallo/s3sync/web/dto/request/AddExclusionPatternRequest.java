@@ -4,7 +4,7 @@ import javax.validation.constraints.NotEmpty;
 
 import it.pasqualecavallo.s3sync.web.dto.request.validator.RegExp;
 
-public class AddExclusionPatterRequest {
+public class AddExclusionPatternRequest {
 
 	@NotEmpty
 	private String remoteFolder;
