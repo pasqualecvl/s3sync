@@ -7,6 +7,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,6 +18,7 @@ import java.util.stream.Collectors;
 import javax.annotation.PostConstruct;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.index.CandidateComponentsIndexLoader;
 import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -217,9 +219,41 @@ public class SynchronizationService {
 				patterns.add(Pattern.compile(regexp));
 			}
 		}
+		if (!present) {
+			AttachedClient currentUser = mongoOperations.findOne(
+					new Query(Criteria.where("alias").is(UserSpecificPropertiesManager.getProperty("client.alias"))),
+					AttachedClient.class);
+			List<String> exclusionPatterns = null;
+			SyncFolder syncFolder = null;
+			for (SyncFolder folder : currentUser.getSyncFolder()) {
+				if (folder.getLocalPath().equals(localFolder)) {
+					syncFolder = folder;
+					if (folder.getExclusionPattern() != null) {
+						exclusionPatterns = folder.getExclusionPattern();
+						for (String regexpSaved : folder.getExclusionPattern()) {
+							if (regexpSaved.equals(regexp)) {
+								exclusionPatterns = null;
+								break;
+							}
+						}
+						if (exclusionPatterns == null) {
+							break;
+						}
+					} else {
+						exclusionPatterns = new ArrayList<>();
+					}
+				} 
+
+			}
+			if (exclusionPatterns != null && syncFolder != null) {
+				exclusionPatterns.add(regexp);
+				syncFolder.setExclusionPattern(Collections.synchronizedList(exclusionPatterns));
+				mongoOperations.save(currentUser);
+			}
+		}
 		return toReturn;
 	}
-	
+
 	public List<String> removeSynchronizationExclusionPattern(String localFolder, String regexp) {
 		List<String> toReturn = new ArrayList<>();
 		List<Pattern> patterns = exclusionPatterns.get(localFolder);
@@ -237,7 +271,21 @@ public class SynchronizationService {
 				patterns.remove(foundPattern);
 			}
 		}
-		return toReturn;		
+		
+		if(foundPattern != null) {
+			AttachedClient currentUser = mongoOperations.findOne(
+					new Query(Criteria.where("alias").is(UserSpecificPropertiesManager.getProperty("client.alias"))),
+					AttachedClient.class);
+			for (SyncFolder folder : currentUser.getSyncFolder()) {
+				if (folder.getLocalPath().equals(localFolder)) {
+					if (folder.getExclusionPattern() != null) {
+						folder.getExclusionPattern().remove(regexp);
+						mongoOperations.save(currentUser);
+					}
+				}
+			}
+		}
+		return toReturn;
 	}
 
 }
