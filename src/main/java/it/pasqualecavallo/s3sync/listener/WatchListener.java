@@ -14,7 +14,9 @@ import java.nio.file.WatchService;
 import java.nio.file.Watchable;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import com.sun.nio.file.SensitivityWatchEventModifier;
 
@@ -31,7 +33,9 @@ public class WatchListener implements Runnable {
 	private SynchronizationService synchronizationService;
 	
 	private Map<String, WatchKey> watchKeys = new HashMap<>();
-
+	private Set<String> directories = new HashSet<>();
+	
+	
 	public WatchListener(UploadService uploadService, SynchronizationService synchronizationService,
 			String remoteFolder, String localRootFolder) {
 		this.uploadService = uploadService;
@@ -56,6 +60,7 @@ public class WatchListener implements Runnable {
 											StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_MODIFY,
 											StandardWatchEventKinds.OVERFLOW },
 									SensitivityWatchEventModifier.MEDIUM));
+					directories.add(dir.toString());
 					return FileVisitResult.CONTINUE;
 				}
 			});
@@ -96,6 +101,7 @@ public class WatchListener implements Runnable {
 										StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_MODIFY,
 										StandardWatchEventKinds.OVERFLOW },
 								SensitivityWatchEventModifier.MEDIUM));
+						directories.add(fullLocation);
 					} catch (IOException e) {
 						e.printStackTrace();
 					}
@@ -106,13 +112,14 @@ public class WatchListener implements Runnable {
 				uploadService.upload(fullPath, remoteFolder, fullLocation.replaceFirst(localRootFolder, ""));
 				break;
 			case "ENTRY_DELETE":
-				if (fullPath.toFile().isDirectory()) {
+				if (directories.contains(fullLocation)) {
 					if (watchKeys.containsKey(fullLocation)) {
 						watchKeys.get(fullLocation).cancel();
+						watchKeys.remove(fullLocation);
 					}
 					uploadService.deleteAsFolder(remoteFolder, fullLocation.replaceFirst(localRootFolder, ""));
+					directories.remove(fullLocation);
 				} else {
-					// FIXME: delete folder content, sign them as deleted in db
 					uploadService.delete(remoteFolder, fullLocation.replaceFirst(localRootFolder, ""));
 				}
 				break;

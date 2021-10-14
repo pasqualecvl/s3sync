@@ -17,6 +17,7 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 
 import it.pasqualecavallo.s3sync.listener.SynchronizationMessageDto;
 import it.pasqualecavallo.s3sync.listener.SynchronizationMessageDto.S3Action;
+import it.pasqualecavallo.s3sync.model.AttachedClient;
 import it.pasqualecavallo.s3sync.model.Item;
 import it.pasqualecavallo.s3sync.utils.FileUtils;
 import it.pasqualecavallo.s3sync.utils.GlobalPropertiesManager;
@@ -46,6 +47,9 @@ public class UploadService {
 	@Autowired
 	private AmqpTemplate amqpTemplate;
 
+	@Autowired
+	private SynchronizationService synchronizationService;
+	
 	@Autowired
 	@Qualifier("sqsJsonMapper")
 	private JsonMapper jsonMapper;
@@ -129,12 +133,40 @@ public class UploadService {
 	}
 
 	public void deleteAsFolder(String remoteFolder, String relativeLocation) {
-		List<Item> toDelete = mongoOperations.find(
-				new Query(
-						Criteria.where("ownedByFolder").is(remoteFolder).and("originalName").regex("/^"+relativeLocation+"/")), Item.class);
-		toDelete.forEach(item -> {
-			delete(item.getOwnedByFolder(), item.getOriginalName());
-		});
+		AttachedClient currentUser = mongoOperations.findOne(
+				new Query(Criteria.where("alias").is(UserSpecificPropertiesManager.getProperty("client.alias"))),
+				AttachedClient.class);
+
+		// if recursive removal allowed, delete any items in folder locally and remote
+		if(currentUser.getClientConfiguration().isPreventFolderRecursiveRemoval()) {
+			if(relativeLocation.isBlank()) {
+				//event on localRootFolder
+				synchronizationService.removeSynchronizationFolder(
+						synchronizationService.getSynchronizedLocalRootFolderByRemoteFolder(remoteFolder));
+			} else {
+				synchronizationService.addSynchronizationExclusionPattern(synchronizationService.getSynchronizedLocalRootFolderByRemoteFolder(remoteFolder), 
+						"^"+relativeLocation);
+			}
+		} else {
+			if(relativeLocation.isBlank()) {
+				//localRootFolder -> pick all items in folder
+				List<Item> toDelete = mongoOperations.find(
+						new Query(
+								Criteria.where("ownedByFolder").is(remoteFolder)), Item.class);
+				toDelete.forEach(item -> {
+					delete(item.getOwnedByFolder(), item.getOriginalName());
+				});			
+			} else {
+				//subfolder -> filter filename by regexp
+				List<Item> toDelete = mongoOperations.find(
+						new Query(
+								Criteria.where("ownedByFolder").is(remoteFolder).and("originalName").regex("/^"+relativeLocation+"/")), Item.class);
+				toDelete.forEach(item -> {
+					delete(item.getOwnedByFolder(), item.getOriginalName());
+				});			
+
+			}
+		}
 	}
 
 }
