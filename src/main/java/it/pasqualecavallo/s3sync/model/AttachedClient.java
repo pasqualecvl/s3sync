@@ -1,16 +1,8 @@
 package it.pasqualecavallo.s3sync.model;
 
-import java.math.BigInteger;
 import java.util.List;
 
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
-
-@Document
 public class AttachedClient {
-
-	@Id
-	private BigInteger _id;
 
 	private String alias;
 
@@ -22,16 +14,8 @@ public class AttachedClient {
 		return alias;
 	}
 
-	public BigInteger get_id() {
-		return _id;
-	}
-
 	public void setAlias(String alias) {
 		this.alias = alias;
-	}
-
-	public void set_id(BigInteger _id) {
-		this._id = _id;
 	}
 
 	public List<SyncFolder> getSyncFolder() {

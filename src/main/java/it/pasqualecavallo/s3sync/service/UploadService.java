@@ -73,12 +73,12 @@ public class UploadService {
 				}
 				item.setDeleted(false);
 				item.setLastUpdate(System.currentTimeMillis());
-				item.setUploadedBy(UserSpecificPropertiesManager.getProperty("client.alias"));
+				item.setUploadedBy(UserSpecificPropertiesManager.getConfiguration().getAlias());
 				mongoOperations.save(item);
 				SynchronizationMessageDto dto = new SynchronizationMessageDto();
 				dto.setFile(relativePath);
 				dto.setRemoteFolder(remoteFolder);
-				dto.setSource(UserSpecificPropertiesManager.getProperty("client.alias"));
+				dto.setSource(UserSpecificPropertiesManager.getConfiguration().getAlias());
 				dto.setS3Action(isCreate ? S3Action.CREATE : S3Action.MODIFY);
 				amqpTemplate.convertAndSend(dto);
 			}
@@ -128,14 +128,12 @@ public class UploadService {
 		dto.setFile(relativePath);
 		dto.setRemoteFolder(remoteFolder);
 		dto.setS3Action(S3Action.DELETE);
-		dto.setSource(UserSpecificPropertiesManager.getProperty("client.alias"));
+		dto.setSource(UserSpecificPropertiesManager.getConfiguration().getAlias());
 		amqpTemplate.convertAndSend(dto);
 	}
 
 	public void deleteAsFolder(String remoteFolder, String relativeLocation) {
-		AttachedClient currentUser = mongoOperations.findOne(
-				new Query(Criteria.where("alias").is(UserSpecificPropertiesManager.getProperty("client.alias"))),
-				AttachedClient.class);
+		AttachedClient currentUser = UserSpecificPropertiesManager.getConfiguration();
 
 		// if recursive removal allowed, delete any items in folder locally and remote
 		if(currentUser.getClientConfiguration().isPreventFolderRecursiveRemoval()) {

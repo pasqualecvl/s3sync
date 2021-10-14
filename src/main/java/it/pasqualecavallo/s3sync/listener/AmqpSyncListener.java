@@ -35,7 +35,7 @@ public class AmqpSyncListener {
 		WatchListeners.lockSemaphore();
 		logger.debug("Locking WatchListeners");
 		try {
-			if(!dto.getSource().equals(UserSpecificPropertiesManager.getProperty("client.alias"))) {
+			if(!dto.getSource().equals(UserSpecificPropertiesManager.getConfiguration().getAlias())) {
 				String localFolder = synchronizationService
 						.getSynchronizedLocalRootFolderByRemoteFolder(dto.getRemoteFolder());
 				if(localFolder != null) {

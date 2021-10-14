@@ -18,7 +18,6 @@ import java.util.stream.Collectors;
 import javax.annotation.PostConstruct;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.index.CandidateComponentsIndexLoader;
 import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -55,9 +54,7 @@ public class SynchronizationService {
 	private void synchronizeOnStartup() {
 		WatchListeners.lockSemaphore();
 		try {
-			AttachedClient client = mongoOperations.findOne(
-					new Query(Criteria.where("alias").is(UserSpecificPropertiesManager.getProperty("client.alias"))),
-					AttachedClient.class);
+			AttachedClient client = UserSpecificPropertiesManager.getConfiguration();
 			// fast fill synchronizedFolder map
 			client.getSyncFolder().forEach(folder -> {
 				synchronized (synchronizedFolder) {
@@ -130,7 +127,7 @@ public class SynchronizationService {
 						e.printStackTrace();
 					}
 				} else {
-					if (item.getUploadedBy().equals(UserSpecificPropertiesManager.getProperty("client.alias"))) {
+					if (item.getUploadedBy().equals(UserSpecificPropertiesManager.getConfiguration().getAlias())) {
 						// deleted items -> uploaded by current user but not found on local machine
 						if (!Path.of(localRootFolder + item.getOriginalName()).toFile().exists()) {
 							uploadService.delete(remoteFolder, item.getOriginalName());
@@ -172,9 +169,7 @@ public class SynchronizationService {
 			synchronizedFolder.remove(localRootFolder);
 		}
 		WatchListeners.stopThread(localRootFolder);
-		AttachedClient client = mongoOperations.findOne(
-				new Query(Criteria.where("alias").is(UserSpecificPropertiesManager.getProperty("client.alias"))),
-				AttachedClient.class);
+		AttachedClient client = UserSpecificPropertiesManager.getConfiguration();
 
 		for (SyncFolder folder : client.getSyncFolder()) {
 			if (folder.getLocalPath().equals(localRootFolder)) {
@@ -182,7 +177,7 @@ public class SynchronizationService {
 				break;
 			}
 		}
-		mongoOperations.save(client);
+		UserSpecificPropertiesManager.setConfiguration(client);
 	}
 
 	public String getSynchronizedRemoteFolderByLocalRootFolder(String localRootFolder) {
@@ -220,9 +215,7 @@ public class SynchronizationService {
 			}
 		}
 		if (!present) {
-			AttachedClient currentUser = mongoOperations.findOne(
-					new Query(Criteria.where("alias").is(UserSpecificPropertiesManager.getProperty("client.alias"))),
-					AttachedClient.class);
+			AttachedClient currentUser = UserSpecificPropertiesManager.getConfiguration();
 			List<String> exclusionPatterns = null;
 			SyncFolder syncFolder = null;
 			for (SyncFolder folder : currentUser.getSyncFolder()) {
@@ -248,7 +241,7 @@ public class SynchronizationService {
 			if (exclusionPatterns != null && syncFolder != null) {
 				exclusionPatterns.add(regexp);
 				syncFolder.setExclusionPattern(Collections.synchronizedList(exclusionPatterns));
-				mongoOperations.save(currentUser);
+				UserSpecificPropertiesManager.setConfiguration(currentUser);
 			}
 		}
 		return toReturn;
@@ -273,14 +266,12 @@ public class SynchronizationService {
 		}
 		
 		if(foundPattern != null) {
-			AttachedClient currentUser = mongoOperations.findOne(
-					new Query(Criteria.where("alias").is(UserSpecificPropertiesManager.getProperty("client.alias"))),
-					AttachedClient.class);
+			AttachedClient currentUser = UserSpecificPropertiesManager.getConfiguration();
 			for (SyncFolder folder : currentUser.getSyncFolder()) {
 				if (folder.getLocalPath().equals(localFolder)) {
 					if (folder.getExclusionPattern() != null) {
 						folder.getExclusionPattern().remove(regexp);
-						mongoOperations.save(currentUser);
+						UserSpecificPropertiesManager.setConfiguration(currentUser);
 					}
 				}
 			}

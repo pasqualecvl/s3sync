@@ -5,8 +5,6 @@ import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoOperations;
-import org.springframework.data.mongodb.core.query.Criteria;
-import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 
 import it.pasqualecavallo.s3sync.listener.WatchListeners;
@@ -36,9 +34,7 @@ public class ManageFolderService {
 	private UploadService uploadService;
 
 	public AddFolderResponse addFolder(String localPath, String remotePath) {
-		String clientAlias = UserSpecificPropertiesManager.getProperty("client.alias");
-		AttachedClient client = mongoOperations.findOne(new Query(Criteria.where("alias").is(clientAlias)),
-				AttachedClient.class);
+		AttachedClient client = UserSpecificPropertiesManager.getConfiguration();
 		List<SyncFolder> folders = client.getSyncFolder();
 		SyncFolder foundFolder = null;
 		for (SyncFolder folder : folders) {
@@ -65,7 +61,7 @@ public class ManageFolderService {
 		folder.setLocalPath(localPath);
 		folder.setRemotePath(remotePath);
 		client.getSyncFolder().add(folder);
-		mongoOperations.save(client);
+		UserSpecificPropertiesManager.setConfiguration(client);
 	}
 
 	private void startListenerThread(String remoteFolder, String localRootFolder) {
@@ -73,9 +69,7 @@ public class ManageFolderService {
 	}
 
 	public ListSyncFoldersResponse listFolders(Integer page, Integer pageSize) {
-		String clientAlias = UserSpecificPropertiesManager.getProperty("client.alias");
-		AttachedClient client = mongoOperations.findOne(new Query(Criteria.where("alias").is(clientAlias)),
-				AttachedClient.class);
+		AttachedClient client = UserSpecificPropertiesManager.getConfiguration();
 		ListSyncFoldersResponse response = new ListSyncFoldersResponse();
 		List<SyncFolderResponse> responseList = new ArrayList<>();
 		List<SyncFolder> syncFolders = client.getSyncFolder();

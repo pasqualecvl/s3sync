@@ -31,11 +31,8 @@ public class StartListenerService {
 	
 	@PostConstruct
 	public void startListeners() {
-		String clientAlias = UserSpecificPropertiesManager.getProperty("client.alias");
-		AttachedClient client = mongoOperations.findOne(
-				new Query(Criteria.where("alias")
-						.is(clientAlias)),
-				AttachedClient.class);
+		String clientAlias = UserSpecificPropertiesManager.getConfiguration().getAlias();
+		AttachedClient client = UserSpecificPropertiesManager.getConfiguration();
 		if(client == null) {
 			AttachedClient attachedClient = new AttachedClient();
 			attachedClient.setAlias(clientAlias);

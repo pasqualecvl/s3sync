@@ -32,7 +32,7 @@ public class MessageBrokerConfiguration {
 	@Bean
 	public Queue queue() {
 		return new Queue(GlobalPropertiesManager.getProperty("amqp.queue") + "_" +
-				UserSpecificPropertiesManager.getProperty("client.alias"), false, false, false, null);
+				UserSpecificPropertiesManager.getConfiguration().getAlias(), false, false, false, null);
 	}
 
 	@Bean
@@ -53,7 +53,7 @@ public class MessageBrokerConfiguration {
 		SimpleMessageListenerContainer container = new SimpleMessageListenerContainer();
 		container.setConnectionFactory(connectionFactory);
 		container.setQueueNames(GlobalPropertiesManager.getProperty("amqp.queue") + "_" +
-				UserSpecificPropertiesManager.getProperty("client.alias"));
+				UserSpecificPropertiesManager.getConfiguration().getAlias());
 		container.setMessageListener(listenerAdapter);
 		return container;
 	}
