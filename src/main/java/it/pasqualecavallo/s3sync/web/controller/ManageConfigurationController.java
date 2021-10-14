@@ -1,22 +1,44 @@
 package it.pasqualecavallo.s3sync.web.controller;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import javax.validation.Valid;
+
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-import it.pasqualecavallo.s3sync.service.ManageConfigurationService;
-import it.pasqualecavallo.s3sync.web.dto.response.ListGlobalConfigurationResponse;
+import it.pasqualecavallo.s3sync.model.AttachedClient;
+import it.pasqualecavallo.s3sync.model.AttachedClient.ClientConfiguration;
+import it.pasqualecavallo.s3sync.utils.UserSpecificPropertiesManager;
+import it.pasqualecavallo.s3sync.web.dto.UserConfigurationExchange;
 
 @RestController
 public class ManageConfigurationController {
-
-	@Autowired
-	private ManageConfigurationService manageConfigurationService;
 	
-	@GetMapping(value="/api/configuration/list_global")
-	public ListGlobalConfigurationResponse listGlobalConfiguration() {
-		//return manageConfigurationService.getGlobalConfiguration();
-		return null;
+	@GetMapping(value="/api/configuration/list")
+	public UserConfigurationExchange listUserConfiguration() {
+		return convertToRest(UserSpecificPropertiesManager.getConfiguration());
 	}
+	
+	@PostMapping(value="/api/configuration/save")
+	public void saveUserConfiguration(@RequestBody @Valid UserConfigurationExchange configuration) {
+		convertToConfig(configuration);
+	}
+
+	private void convertToConfig(@Valid UserConfigurationExchange configuration) {
+		AttachedClient client = UserSpecificPropertiesManager.getConfiguration();
+		client.getClientConfiguration().setPreventFolderRecursiveRemoval(configuration.isPreventFolderRecursiveRemoval());
+		client.getClientConfiguration().setRunSynchronizationOnStartup(configuration.isRunSynchronizationOnStartup());
+		UserSpecificPropertiesManager.setConfiguration(client);
+	}
+
+	private UserConfigurationExchange convertToRest(AttachedClient configuration) {
+		ClientConfiguration clientConfiguration = configuration.getClientConfiguration();
+		UserConfigurationExchange userConfigurationExchange = new UserConfigurationExchange();
+		userConfigurationExchange.setPreventFolderRecursiveRemoval(clientConfiguration.isPreventFolderRecursiveRemoval());
+		userConfigurationExchange.setRunSynchronizationOnStartup(clientConfiguration.isRunSynchronizationOnStartup());
+		return userConfigurationExchange;
+	}
+	
 	
 }

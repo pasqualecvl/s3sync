@@ -17,6 +17,7 @@ import it.pasqualecavallo.s3sync.web.dto.request.RemoveExclusionPatterRequest;
 import it.pasqualecavallo.s3sync.web.dto.request.RemoveFolderRequest;
 import it.pasqualecavallo.s3sync.web.dto.response.AddExclusionPatterResponse;
 import it.pasqualecavallo.s3sync.web.dto.response.AddFolderResponse;
+import it.pasqualecavallo.s3sync.web.dto.response.ListRemoteFolderResponse;
 import it.pasqualecavallo.s3sync.web.dto.response.ListSyncFoldersResponse;
 import it.pasqualecavallo.s3sync.web.dto.response.RemoveExclusionPatterResponse;
 import it.pasqualecavallo.s3sync.web.dto.response.RemoveFolderResponse;
@@ -27,6 +28,10 @@ public class ManageFolderController {
 	@Autowired
 	private ManageFolderService manageFolderService;
 	
+	@GetMapping(value = "/api/folder/list_remote")
+	public ListRemoteFolderResponse listRemoteFolder(@RequestParam Integer page, @RequestParam Integer pageSize) {
+		return manageFolderService.listRemoteFolders(page, pageSize);
+	}
 	@PostMapping(value = "/api/folder/add")
 	public AddFolderResponse addFolder(@RequestBody @Valid AddFolderRequest addFolderRequest) {
 		return manageFolderService.addFolder(addFolderRequest.getLocalFolder(), addFolderRequest.getRemoteFolder());

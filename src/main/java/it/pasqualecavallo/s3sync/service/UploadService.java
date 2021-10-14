@@ -3,6 +3,7 @@ package it.pasqualecavallo.s3sync.service;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 
 import org.springframework.amqp.core.AmqpTemplate;
@@ -19,6 +20,7 @@ import it.pasqualecavallo.s3sync.listener.SynchronizationMessageDto;
 import it.pasqualecavallo.s3sync.listener.SynchronizationMessageDto.S3Action;
 import it.pasqualecavallo.s3sync.model.AttachedClient;
 import it.pasqualecavallo.s3sync.model.Item;
+import it.pasqualecavallo.s3sync.model.SharedData;
 import it.pasqualecavallo.s3sync.utils.FileUtils;
 import it.pasqualecavallo.s3sync.utils.GlobalPropertiesManager;
 import it.pasqualecavallo.s3sync.utils.UserSpecificPropertiesManager;
@@ -141,6 +143,7 @@ public class UploadService {
 				//event on localRootFolder
 				synchronizationService.removeSynchronizationFolder(
 						synchronizationService.getSynchronizedLocalRootFolderByRemoteFolder(remoteFolder));
+				removeRemoteFolder(remoteFolder);
 			} else {
 				synchronizationService.addSynchronizationExclusionPattern(synchronizationService.getSynchronizedLocalRootFolderByRemoteFolder(remoteFolder), 
 						"^"+relativeLocation);
@@ -165,6 +168,20 @@ public class UploadService {
 
 			}
 		}
+	}
+
+	private void removeRemoteFolder(String remoteFolder) {
+		List<SharedData> data = mongoOperations.findAll(SharedData.class);
+		if(data.size() != 1) {
+			throw new RuntimeException("SharedData must contains exactly one document");
+		} else {
+			SharedData item = data.get(0);
+			if(item.getRemoteFolders().stream().filter(string -> string.equals(remoteFolder)).count() == 1L) {
+				item.getRemoteFolders().remove(remoteFolder);
+				mongoOperations.save(item);
+			}
+		}
+
 	}
 
 }

@@ -1,12 +1,13 @@
 package it.pasqualecavallo.s3sync.model;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class AttachedClient {
 
 	private String alias;
 
-	private List<SyncFolder> syncFolder;
+	private List<SyncFolder> syncFolder = new ArrayList<>();
 
 	private ClientConfiguration clientConfiguration = new ClientConfiguration();
 	

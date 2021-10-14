@@ -1,6 +1,7 @@
 package it.pasqualecavallo.s3sync.service;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,11 +11,14 @@ import org.springframework.stereotype.Service;
 import it.pasqualecavallo.s3sync.listener.WatchListeners;
 import it.pasqualecavallo.s3sync.model.AttachedClient;
 import it.pasqualecavallo.s3sync.model.AttachedClient.SyncFolder;
+import it.pasqualecavallo.s3sync.model.SharedData;
+import it.pasqualecavallo.s3sync.utils.ListUtils;
 import it.pasqualecavallo.s3sync.utils.UserSpecificPropertiesManager;
 import it.pasqualecavallo.s3sync.web.controller.advice.exception.BadRequestException;
 import it.pasqualecavallo.s3sync.web.controller.advice.exception.InternalServerErrorException;
 import it.pasqualecavallo.s3sync.web.dto.response.AddExclusionPatterResponse;
 import it.pasqualecavallo.s3sync.web.dto.response.AddFolderResponse;
+import it.pasqualecavallo.s3sync.web.dto.response.ListRemoteFolderResponse;
 import it.pasqualecavallo.s3sync.web.dto.response.ListSyncFoldersResponse;
 import it.pasqualecavallo.s3sync.web.dto.response.RemoveExclusionPatterResponse;
 import it.pasqualecavallo.s3sync.web.dto.response.RemoveFolderResponse;
@@ -44,15 +48,33 @@ public class ManageFolderService {
 			}
 		}
 		if (foundFolder == null) {
-			addToPersistence(client, localPath, remotePath);
 			synchronizationService.synchronize(remotePath, localPath);
+			addToPersistence(client, localPath, remotePath);
 			startListenerThread(remotePath, localPath);
+			addRemoteFolder(remotePath);
 			AddFolderResponse response = new AddFolderResponse();
 			response.setLocalFolder(localPath);
 			response.setRemoteFolder(remotePath);
 			return response;
 		} else {
 			throw new BadRequestException(ErrorMessage.E400_BAD_REQUEST, "Folder is alredy in sync");
+		}
+	}
+
+	private void addRemoteFolder(String remotePath) {
+		List<SharedData> data = mongoOperations.findAll(SharedData.class);
+		if(data.size() == 0) {
+			SharedData item = new SharedData();
+			item.setRemoteFolders(Arrays.asList(remotePath));
+			mongoOperations.save(item);
+		} else if(data.size() > 1) {
+			throw new RuntimeException("SharedData must contains exactly one document");
+		} else {
+			SharedData item = data.get(0);
+			if(item.getRemoteFolders().stream().filter(string -> string.equals(remotePath)).count() == 0L) {
+				item.getRemoteFolders().add(remotePath);
+				mongoOperations.save(item);
+			}
 		}
 	}
 
@@ -73,16 +95,7 @@ public class ManageFolderService {
 		ListSyncFoldersResponse response = new ListSyncFoldersResponse();
 		List<SyncFolderResponse> responseList = new ArrayList<>();
 		List<SyncFolder> syncFolders = client.getSyncFolder();
-		List<SyncFolder> subSyncFolders = new ArrayList<>();
-		int listSize = syncFolders != null ? syncFolders.size() : 0;
-		if (listSize != 0 && page < (int) Math.ceil((double) listSize / (double) pageSize)) {
-			if (listSize > ((page + 1) * pageSize)) {
-				subSyncFolders = syncFolders.subList(pageSize * page, pageSize * (page + 1));
-			} else {
-				subSyncFolders = syncFolders.subList(pageSize * page, listSize);
-			}
-		}
-
+		List<SyncFolder> subSyncFolders = ListUtils.getPageOf(syncFolders, page, pageSize);
 		for (SyncFolder folder : subSyncFolders) {
 			SyncFolderResponse responseItem = new SyncFolderResponse();
 			responseItem.setLocalFolder(folder.getLocalPath());
@@ -129,5 +142,17 @@ public class ManageFolderService {
 			throw new InternalServerErrorException(ErrorMessage.E500_GENERIC_ERROR);
 		}		
 	}
+
+	public ListRemoteFolderResponse listRemoteFolders(Integer page, Integer pageSize) {
+		ListRemoteFolderResponse response = new ListRemoteFolderResponse();
+		List<SharedData> data = mongoOperations.findAll(SharedData.class);
+		if(data.size() != 1) {
+			response.setRemoteFolder(new ArrayList<>());
+		} else {
+			response.setRemoteFolder(data.get(0).getRemoteFolders());
+		}
+		return response;
+	}
+	
 	
 }
