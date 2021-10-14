@@ -35,7 +35,7 @@ public class AttachedClient {
 		this.clientConfiguration = clientConfiguration;
 	}
 	
-	public class SyncFolder {
+	public static class SyncFolder {
 
 		private String localPath;
 		private String remotePath;
@@ -66,7 +66,7 @@ public class AttachedClient {
 		}
 	}
 
-	public class ClientConfiguration {
+	public static class ClientConfiguration {
 		
 		private boolean preventFolderRecursiveRemoval = false;
 		private boolean runSynchronizationOnStartup = true;

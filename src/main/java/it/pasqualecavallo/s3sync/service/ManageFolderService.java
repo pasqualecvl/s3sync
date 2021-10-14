@@ -79,7 +79,7 @@ public class ManageFolderService {
 	}
 
 	private void addToPersistence(AttachedClient client, String localPath, String remotePath) {
-		SyncFolder folder = client.new SyncFolder();
+		SyncFolder folder = new SyncFolder();
 		folder.setLocalPath(localPath);
 		folder.setRemotePath(remotePath);
 		client.getSyncFolder().add(folder);

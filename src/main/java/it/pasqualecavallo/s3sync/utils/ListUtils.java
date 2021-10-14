@@ -13,9 +13,9 @@ public class ListUtils {
 		}
 		if (listSize != 0 && page < (int) Math.ceil((double) listSize / (double) pageSize)) {
 			if (listSize > ((page + 1) * pageSize)) {
-				sublist = sublist.subList(pageSize * page, pageSize * (page + 1));
+				sublist = list.subList(pageSize * page, pageSize * (page + 1));
 			} else {
-				sublist = sublist.subList(pageSize * page, listSize);
+				sublist = list.subList(pageSize * page, listSize);
 			}
 		}
 		return sublist;
