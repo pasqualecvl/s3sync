@@ -70,7 +70,7 @@ public class AttachedClient {
 		
 		private boolean preventFolderRecursiveRemoval = false;
 		private boolean runSynchronizationOnStartup = true;
-		
+		private boolean useTrashOverDelete = true;
 		
 		public boolean isPreventFolderRecursiveRemoval() {
 			return preventFolderRecursiveRemoval;
@@ -86,6 +86,14 @@ public class AttachedClient {
 		
 		public void setRunSynchronizationOnStartup(boolean runSynchronizationOnStartup) {
 			this.runSynchronizationOnStartup = runSynchronizationOnStartup;
+		}
+		
+		public boolean isUseTrashOverDelete() {
+			return useTrashOverDelete;
+		}
+		
+		public void setUseTrashOverDelete(boolean useTrashOverDelete) {
+			this.useTrashOverDelete = useTrashOverDelete;
 		}
 	}
 }

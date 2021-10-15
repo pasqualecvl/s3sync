@@ -6,8 +6,10 @@ import it.pasqualecavallo.s3sync.web.dto.response.RestBaseResponse.ErrorMessage;
 
 public class BadRequestException extends RuntimeException {
 	
-	Iterable<String> placeholders;
-	ErrorMessage errorMessage;
+	private static final long serialVersionUID = 934263467604479908L;
+
+	private Iterable<String> placeholders;
+	private ErrorMessage errorMessage;
 	
 	public BadRequestException(ErrorMessage errorMessage, String...placeholders) {
 		this.placeholders = Arrays.asList(placeholders);

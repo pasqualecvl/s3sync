@@ -29,6 +29,7 @@ public class ManageConfigurationController {
 		AttachedClient client = UserSpecificPropertiesManager.getConfiguration();
 		client.getClientConfiguration().setPreventFolderRecursiveRemoval(configuration.isPreventFolderRecursiveRemoval());
 		client.getClientConfiguration().setRunSynchronizationOnStartup(configuration.isRunSynchronizationOnStartup());
+		client.getClientConfiguration().setUseTrashOverDelete(configuration.isUseTrashOverDelete());
 		UserSpecificPropertiesManager.setConfiguration(client);
 	}
 
@@ -37,6 +38,7 @@ public class ManageConfigurationController {
 		UserConfigurationExchange userConfigurationExchange = new UserConfigurationExchange();
 		userConfigurationExchange.setPreventFolderRecursiveRemoval(clientConfiguration.isPreventFolderRecursiveRemoval());
 		userConfigurationExchange.setRunSynchronizationOnStartup(clientConfiguration.isRunSynchronizationOnStartup());
+		userConfigurationExchange.setUseTrashOverDelete(clientConfiguration.isUseTrashOverDelete());
 		return userConfigurationExchange;
 	}
 	
