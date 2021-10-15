@@ -76,24 +76,30 @@ public class AttachedClient {
 			return preventFolderRecursiveRemoval;
 		}
 
-		public void setPreventFolderRecursiveRemoval(boolean preventFolderRecursiveRemoval) {
-			this.preventFolderRecursiveRemoval = preventFolderRecursiveRemoval;
+		public void setPreventFolderRecursiveRemoval(Boolean preventFolderRecursiveRemoval) {
+			if(preventFolderRecursiveRemoval != null) {
+				this.preventFolderRecursiveRemoval = preventFolderRecursiveRemoval;
+			}
 		}
 		
 		public boolean isRunSynchronizationOnStartup() {
 			return runSynchronizationOnStartup;
 		}
 		
-		public void setRunSynchronizationOnStartup(boolean runSynchronizationOnStartup) {
-			this.runSynchronizationOnStartup = runSynchronizationOnStartup;
+		public void setRunSynchronizationOnStartup(Boolean runSynchronizationOnStartup) {
+			if(runSynchronizationOnStartup != null) {
+				this.runSynchronizationOnStartup = runSynchronizationOnStartup;				
+			}
 		}
 		
 		public boolean isUseTrashOverDelete() {
 			return useTrashOverDelete;
 		}
 		
-		public void setUseTrashOverDelete(boolean useTrashOverDelete) {
-			this.useTrashOverDelete = useTrashOverDelete;
+		public void setUseTrashOverDelete(Boolean useTrashOverDelete) {
+			if(useTrashOverDelete != null) {
+				this.useTrashOverDelete = useTrashOverDelete;				
+			}
 		}
 	}
 }
