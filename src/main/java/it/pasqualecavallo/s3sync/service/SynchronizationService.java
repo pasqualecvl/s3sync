@@ -281,4 +281,10 @@ public class SynchronizationService {
 		return toReturn;
 	}
 
+	public void cacheSynchronizationFolder(String remotePath, String localPath) {
+		synchronized (synchronizedFolder) {
+			synchronizedFolder.put(localPath, remotePath);
+		}
+	}
+
 }

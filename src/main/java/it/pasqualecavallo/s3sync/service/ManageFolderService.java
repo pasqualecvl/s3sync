@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.stereotype.Service;
@@ -37,6 +39,8 @@ public class ManageFolderService {
 	@Autowired
 	private UploadService uploadService;
 
+	private static final Logger logger = LoggerFactory.getLogger(ManageFolderService.class); 
+	
 	public AddFolderResponse addFolder(String localPath, String remotePath) {
 		AttachedClient client = UserSpecificPropertiesManager.getConfiguration();
 		List<SyncFolder> folders = client.getSyncFolder();
@@ -48,7 +52,9 @@ public class ManageFolderService {
 			}
 		}
 		if (foundFolder == null) {
+			logger.info("[[INFO]] Add folder {} to s3 {}", localPath, remotePath);
 			synchronizationService.synchronize(remotePath, localPath);
+			synchronizationService.cacheSynchronizationFolder(remotePath, localPath);
 			addToPersistence(client, localPath, remotePath);
 			startListenerThread(remotePath, localPath);
 			addRemoteFolder(remotePath);
@@ -64,9 +70,11 @@ public class ManageFolderService {
 	private void addRemoteFolder(String remotePath) {
 		List<SharedData> data = mongoOperations.findAll(SharedData.class);
 		if(data.size() == 0) {
+			logger.debug("[[DEBUG]] Folder {} not found in SharedDatas because SharedData is currently null", remotePath);
 			SharedData item = new SharedData();
 			item.setRemoteFolders(Arrays.asList(remotePath));
 			mongoOperations.save(item);
+			logger.info("[[INFO]] Saved {} as remote folder in SharedData", remotePath);
 		} else if(data.size() > 1) {
 			throw new RuntimeException("SharedData must contains exactly one document");
 		} else {
@@ -74,6 +82,7 @@ public class ManageFolderService {
 			if(item.getRemoteFolders().stream().filter(string -> string.equals(remotePath)).count() == 0L) {
 				item.getRemoteFolders().add(remotePath);
 				mongoOperations.save(item);
+				logger.info("[[INFO]] Saved {} as remote folder in SharedData", remotePath);				
 			}
 		}
 	}
@@ -84,9 +93,11 @@ public class ManageFolderService {
 		folder.setRemotePath(remotePath);
 		client.getSyncFolder().add(folder);
 		UserSpecificPropertiesManager.setConfiguration(client);
+		logger.info("[[INFO]] Added sync folder configuration to config file");
 	}
 
 	private void startListenerThread(String remoteFolder, String localRootFolder) {
+		logger.debug("[[DEBUG]] Starting listener on {}/{}", localRootFolder, remoteFolder);
 		WatchListeners.startThread(uploadService, synchronizationService, remoteFolder, localRootFolder);
 	}
 
@@ -101,9 +112,11 @@ public class ManageFolderService {
 			responseItem.setLocalFolder(folder.getLocalPath());
 			responseItem.setRemoteFolder(folder.getRemotePath());
 			responseItem.setExclusionPatterns(folder.getExclusionPattern());
+			logger.debug("[[DEBUG]] Adding folder to response: {}", responseItem.toString());
 			responseList.add(responseItem);
 		}
 		response.setList(responseList);
+		logger.info("[[INFO]] Returning with {} folders", response.getList().size());
 		return response;
 	}
 

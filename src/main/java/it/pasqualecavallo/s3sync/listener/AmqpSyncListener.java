@@ -33,14 +33,14 @@ public class AmqpSyncListener {
 
 	public void receiveSyncMessage(SynchronizationMessageDto dto) {
 		WatchListeners.lockSemaphore();
-		logger.debug("Locking WatchListeners");
+		logger.info("Locking WatchListeners");
 		try {
 			if(!dto.getSource().equals(UserSpecificPropertiesManager.getConfiguration().getAlias())) {
 				String localFolder = synchronizationService
 						.getSynchronizedLocalRootFolderByRemoteFolder(dto.getRemoteFolder());
 				if(localFolder != null) {
 					WatchListeners.putChangesWhileLocked(localFolder, dto.getFile());
-					logger.debug("Serving action: " + dto.toString());
+					logger.info("Serving action: " + dto.toString());
 					if (S3Action.CREATE.equals(dto.getS3Action()) || S3Action.MODIFY.equals(dto.getS3Action())) {
 						uploadService.getOrUpdate(localFolder + dto.getFile(), dto.getRemoteFolder() + dto.getFile());
 					} else if (S3Action.DELETE.equals(dto.getS3Action())) {
@@ -48,14 +48,15 @@ public class AmqpSyncListener {
 						if (localFileLastModified <= dto.getTime()) {
 							FileUtils.deleteFileAndEmptyTree(localFolder + dto.getFile());
 						} else {
-							logger.debug("Local file is newer than the remote one: " + localFileLastModified + " -> " + dto.getTime());
+							logger.info("Local file is newer than the remote one: " + localFileLastModified + " -> " + dto.getTime());
 						}
 					}
 				}				
 			} else {
-				logger.debug("Consuming AMQP message made by this client -> discarded");
+				logger.info("Consuming AMQP message made by this client -> discarded");
 			}
 		} finally {
+			logger.info("Release semaphore");
 			WatchListeners.releaseSemaphore();
 		}
 	}

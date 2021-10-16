@@ -44,7 +44,7 @@ public class StartListenerService {
 		}
 	}
 	
-	@Scheduled(fixedDelay = 10000)
+	@Scheduled(fixedDelay = 60000)
 	public void log() {
 		WatchListeners.log();
 	}
