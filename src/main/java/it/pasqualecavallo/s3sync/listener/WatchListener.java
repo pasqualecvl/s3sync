@@ -120,7 +120,9 @@ public class WatchListener implements Runnable {
 					uploadService.deleteAsFolder(remoteFolder, fullLocation.replaceFirst(localRootFolder, ""));
 					directories.remove(fullLocation);
 				} else {
-					uploadService.delete(remoteFolder, fullLocation.replaceFirst(localRootFolder, ""));
+					if(!uploadService.delete(remoteFolder, fullLocation.replaceFirst(localRootFolder, ""))) {
+						System.out.println("Error deleting S3 file");
+					};
 				}
 				break;
 			default:

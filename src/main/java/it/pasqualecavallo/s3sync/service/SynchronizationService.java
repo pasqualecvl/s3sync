@@ -130,7 +130,9 @@ public class SynchronizationService {
 					if (item.getUploadedBy().equals(UserSpecificPropertiesManager.getConfiguration().getAlias())) {
 						// deleted items -> uploaded by current user but not found on local machine
 						if (!Path.of(localRootFolder + item.getOriginalName()).toFile().exists()) {
-							uploadService.delete(remoteFolder, item.getOriginalName());
+							if(!uploadService.delete(remoteFolder, item.getOriginalName())) {
+								System.out.println("Error deleting s3 file");
+							}
 						}
 						continue;
 					}

@@ -3,7 +3,6 @@ package it.pasqualecavallo.s3sync.service;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
-import java.util.Arrays;
 import java.util.List;
 
 import org.springframework.amqp.core.AmqpTemplate;
@@ -111,7 +110,15 @@ public class UploadService {
 		}
 	}
 
-	public void delete(String remoteFolder, String relativePath) {
+	public boolean deleteTrashed(String relativePath) {
+		String s3Bucket = GlobalPropertiesManager.getProperty("s3.bucket");
+		String fileKey = "Trash/" + relativePath;
+		DeleteObjectRequest s3request = DeleteObjectRequest.builder().bucket(s3Bucket).key(fileKey).build();
+		DeleteObjectResponse response = s3Client.deleteObject(s3request);
+		return response.sdkHttpResponse().isSuccessful(); 
+	}
+
+	public boolean delete(String remoteFolder, String relativePath) {
 		System.out.println("Deleting object " + relativePath + "from s3 folder " + remoteFolder);
 		String s3Bucket = GlobalPropertiesManager.getProperty("s3.bucket");
 		String fileKey = remoteFolder + relativePath;
@@ -122,23 +129,28 @@ public class UploadService {
 		}
 		DeleteObjectRequest s3request = DeleteObjectRequest.builder().bucket(s3Bucket).key(fileKey).build();
 		DeleteObjectResponse response = s3Client.deleteObject(s3request);
-		System.out.println("Mark item as deleted");
-		Item item = mongoOperations.findOne(
-				new Query(Criteria.where("ownedByFolder").is(remoteFolder).and("originalName").is(relativePath)),
-				Item.class);
-		if (item != null) {
-			// Item never sync
-			item.setDeleted(true);
-			item.setLastUpdate(System.currentTimeMillis());
-			mongoOperations.save(item);
+		if(response.sdkHttpResponse().isSuccessful()) {
+			System.out.println("Mark item as deleted");
+			Item item = mongoOperations.findOne(
+					new Query(Criteria.where("ownedByFolder").is(remoteFolder).and("originalName").is(relativePath)),
+					Item.class);
+			if (item != null) {
+				// Item never sync
+				item.setDeleted(true);
+				item.setLastUpdate(System.currentTimeMillis());
+				mongoOperations.save(item);
+			}
+	
+			SynchronizationMessageDto dto = new SynchronizationMessageDto();
+			dto.setFile(relativePath);
+			dto.setRemoteFolder(remoteFolder);
+			dto.setS3Action(S3Action.DELETE);
+			dto.setSource(UserSpecificPropertiesManager.getConfiguration().getAlias());
+			amqpTemplate.convertAndSend(dto);
+			return true;
+		} else {
+			return false;
 		}
-
-		SynchronizationMessageDto dto = new SynchronizationMessageDto();
-		dto.setFile(relativePath);
-		dto.setRemoteFolder(remoteFolder);
-		dto.setS3Action(S3Action.DELETE);
-		dto.setSource(UserSpecificPropertiesManager.getConfiguration().getAlias());
-		amqpTemplate.convertAndSend(dto);
 	}
 
 	public void deleteAsFolder(String remoteFolder, String relativeLocation) {
@@ -162,16 +174,19 @@ public class UploadService {
 				List<Item> toDelete = mongoOperations.find(new Query(Criteria.where("ownedByFolder").is(remoteFolder)),
 						Item.class);
 				toDelete.forEach(item -> {
-					delete(item.getOwnedByFolder(), item.getOriginalName());
+					if(!delete(item.getOwnedByFolder(), item.getOriginalName())) {
+						System.out.println("Error deleting S3 file");
+					}
 				});
 			} else {
 				// subfolder -> filter filename by regexp
 				List<Item> toDelete = mongoOperations.find(new Query(Criteria.where("ownedByFolder").is(remoteFolder)
 						.and("originalName").regex("/^" + relativeLocation + "/")), Item.class);
 				toDelete.forEach(item -> {
-					delete(item.getOwnedByFolder(), item.getOriginalName());
+					if(!delete(item.getOwnedByFolder(), item.getOriginalName())) {
+						System.out.println("Error deleting S3 file");
+					}
 				});
-
 			}
 		}
 	}

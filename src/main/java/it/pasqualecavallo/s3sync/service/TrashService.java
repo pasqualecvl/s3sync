@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import it.pasqualecavallo.s3sync.utils.GlobalPropertiesManager;
+import it.pasqualecavallo.s3sync.web.dto.response.DeleteTrashItemResponse;
 import it.pasqualecavallo.s3sync.web.dto.response.Folder;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
@@ -19,11 +20,13 @@ public class TrashService {
 	@Autowired
 	private S3Client s3Client;
 
+	@Autowired
+	private UploadService uploadService;
+
 	public Folder navigate(String relativePath) {
 		String s3bucket = GlobalPropertiesManager.getProperty("s3.bucket");
 
-		ListObjectsV2Request request = ListObjectsV2Request.builder().bucket(s3bucket)
-				.prefix(relativePath).build();
+		ListObjectsV2Request request = ListObjectsV2Request.builder().bucket(s3bucket).prefix(relativePath).build();
 		List<String> keys = new ArrayList<>();
 		ListObjectsV2Response list = null;
 		do {
@@ -34,18 +37,34 @@ public class TrashService {
 			request = ListObjectsV2Request.builder().bucket(s3bucket).prefix(relativePath)
 					.continuationToken(list.nextContinuationToken()).build();
 		} while (list.isTruncated());
-		
+
 		return folderize(keys);
+	}
+
+	public DeleteTrashItemResponse deleteAll(List<String> keys) {
+		List<String>deleted = new ArrayList<>();
+		for(String key : keys) {
+			if(uploadService.deleteTrashed(key)) {
+				deleted.add(key);
+			}
+		}
+		DeleteTrashItemResponse response = new DeleteTrashItemResponse();
+		response.setDeleted(deleted);
+		return response;
 	}
 
 	private Folder folderize(List<String> keys) {
 		Folder response = new Folder();
-		for(String key : keys) {
+		for (String key : keys) {
 			String[] tokenized = key.split("/");
 			Folder f = response.addNodes(tokenized);
 			f.addFile(tokenized[tokenized.length - 1]);
 		}
 		return response;
 	}
+
+//	public RecoverTrashedFileResponse recoverAll(String toRemoteFolder, List<String> keys) {
+//		
+//	}
 
 }
