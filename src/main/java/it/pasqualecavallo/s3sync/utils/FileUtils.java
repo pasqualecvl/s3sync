@@ -17,8 +17,9 @@ public class FileUtils {
 
 	private static final Logger logger = LoggerFactory.getLogger(FileUtils.class);
 	
-	public static String[] createFileTree(String fullPath, byte[] content) throws IOException {
+	public static List<String> createFileTree(String fullPath, byte[] content) throws IOException {
 		String[] tokenized = tokenize(fullPath);
+		List<String> folders = new ArrayList<>();
 		logger.trace("Tokenizing string: " + fullPath + " returns with " + Arrays.toString(tokenized));
 		if (tokenized.length > 1) {
 			int index = 0;
@@ -26,6 +27,7 @@ public class FileUtils {
 				Path toFolderPath = Paths.get(tokenized[index]);
 				if (!Files.exists(toFolderPath)) {
 					if (Files.isWritable(toFolderPath.getParent())) {
+						folders.add(toFolderPath.toString());
 						Files.createDirectory(toFolderPath);
 					} else {
 						// FIXME: create custom exception
@@ -39,7 +41,7 @@ public class FileUtils {
 		try (FileOutputStream fos = new FileOutputStream(fullPath)) {
 			  fos.write(content);
 		}
-		return tokenized;
+		return folders;
 	}
 
 	public static List<String> deleteFileAndEmptyTree(String fullPath) {

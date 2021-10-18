@@ -126,7 +126,11 @@ public class WatchListener implements Runnable {
 				}
 			case "ENTRY_MODIFY":
 				logger.debug("[[DEBUG]] Managing event CREATE/MODIFY on file {}, start upload", fullLocation);
-				uploadService.upload(fullPath, remoteFolder, fullLocation.replaceFirst(localRootFolder, ""));
+				try {
+					uploadService.upload(fullPath, remoteFolder, fullLocation.replaceFirst(localRootFolder, ""));
+				} catch(Exception e) {
+					logger.error("Exception saving file {}", fullLocation, e);
+				}
 				break;
 			case "ENTRY_DELETE":
 				logger.debug("[[DEBUG]] Managing event DELETE on file {}", fullLocation);
@@ -140,9 +144,13 @@ public class WatchListener implements Runnable {
 						logger.warn("[[WARN]] WatchKey not found for this folder " + fullLocation);
 					}
 					logger.debug("[[DEBUG]] Delete all files in folder {}", fullLocation);
-					uploadService.deleteAsFolder(remoteFolder, fullLocation.replaceFirst(localRootFolder, ""));
-					logger.debug("[[DEBUG]] Remove folder {} from the folders tree");
-					directories.remove(fullLocation);
+					try {
+						uploadService.deleteAsFolder(remoteFolder, fullLocation.replaceFirst(localRootFolder, ""));
+						logger.debug("[[DEBUG]] Remove folder {} from the folders tree");
+						directories.remove(fullLocation);
+					} catch(Exception e) {
+						logger.error("Exception removing file {}", fullLocation, e);
+					}
 				} else {
 					logger.debug("[[DEBUG]] DELETE event on file " + fullLocation);
 					if (!uploadService.delete(remoteFolder, fullLocation.replaceFirst(localRootFolder, ""))) {

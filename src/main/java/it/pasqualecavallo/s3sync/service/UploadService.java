@@ -107,7 +107,7 @@ public class UploadService {
 
 	}
 
-	public String[] getOrUpdate(String localFullPathFolder, String remoteFullPathFolder) {
+	public List<String> getOrUpdate(String localFullPathFolder, String remoteFullPathFolder) {
 		logger.info("[[INFO]] Fetch or update file {} from remote folder {}", localFullPathFolder, remoteFullPathFolder);
 		GetObjectRequest request = GetObjectRequest.builder().bucket(GlobalPropertiesManager.getProperty("s3.bucket"))
 				.key(remoteFullPathFolder).build();

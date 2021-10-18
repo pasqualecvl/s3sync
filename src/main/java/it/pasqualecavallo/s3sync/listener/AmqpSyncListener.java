@@ -43,7 +43,7 @@ public class AmqpSyncListener {
 					WatchListeners.putChangesWhileLocked(localFolder, dto.getFile());
 					logger.info("Serving action: " + dto.toString());
 					if (S3Action.CREATE.equals(dto.getS3Action()) || S3Action.MODIFY.equals(dto.getS3Action())) {
-						String[] folders = uploadService.getOrUpdate(localFolder + dto.getFile(), dto.getRemoteFolder() + dto.getFile());
+						List<String> folders = uploadService.getOrUpdate(localFolder + dto.getFile(), dto.getRemoteFolder() + dto.getFile());
 						for(String folder : folders) {
 							new Thread(new AddNewWatchKey(folder)).start();							
 						}
