@@ -34,4 +34,10 @@ public class SyncFolderResponse {
 		this.exclusionPatterns = exclusionPatterns;
 	}
 
+	@Override
+	public String toString() {
+		return "SyncFolderResponse [localFolder=" + localFolder + ", remoteFolder=" + remoteFolder
+				+ ", exclusionPatterns=" + exclusionPatterns + "]";
+	}
+
 }

@@ -18,7 +18,7 @@ public class Item {
 	private Long lastUpdate;
 	
 	private String uploadedBy;
-
+	
 	private Boolean deleted = false;
 	
 	public BigInteger get_id() {
