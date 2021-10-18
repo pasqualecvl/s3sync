@@ -17,6 +17,8 @@ import java.util.stream.Collectors;
 
 import javax.annotation.PostConstruct;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -50,19 +52,26 @@ public class SynchronizationService {
 	private static volatile Map<String, String> synchronizedFolder = new HashMap<>();
 	private static volatile Map<String, List<Pattern>> exclusionPatterns = new HashMap<>();
 
+	private static final Logger logger = LoggerFactory.getLogger(SynchronizationService.class);
+
 	@PostConstruct
 	private void synchronizeOnStartup() {
+		logger.info("Run startup synchronization. Lock listeners semaphore");
 		WatchListeners.lockSemaphore();
 		try {
 			AttachedClient client = UserSpecificPropertiesManager.getConfiguration();
 			// fast fill synchronizedFolder map
 			client.getSyncFolder().forEach(folder -> {
+				logger.debug("[[DEBUG]] Add {} -> {} to synchronizationFolders map", folder.getLocalPath(),
+						folder.getRemotePath());
 				synchronized (synchronizedFolder) {
 					synchronizedFolder.put(folder.getLocalPath(), folder.getRemotePath());
 				}
 				synchronized (exclusionPatterns) {
 					exclusionPatterns.put(folder.getLocalPath(), folder.getExclusionPattern() != null
 							? folder.getExclusionPattern().stream().map(pattern -> {
+								logger.debug("[[DEBUG]] Add exclusion pattern {} to {} -> {}", pattern,
+										folder.getLocalPath(), folder.getRemotePath());
 								return Pattern.compile(pattern);
 							}).collect(Collectors.toList())
 							: new ArrayList<>());
@@ -72,8 +81,11 @@ public class SynchronizationService {
 				client.getSyncFolder().forEach(folder -> {
 					synchronize(folder.getRemotePath(), folder.getLocalPath());
 				});
+			} else {
+				logger.debug("[[DEBUG]] Synchronization on startup is disabled.");
 			}
 		} finally {
+			logger.info("Finished. Release lock");
 			WatchListeners.releaseSemaphore();
 		}
 	}
@@ -81,7 +93,9 @@ public class SynchronizationService {
 	public void synchronize(String remoteFolder, String localRootFolder) {
 		try {
 			// DO NOT CHANGE THE ORDER
+			logger.info("[[INFO]] Run startup synchronization from local {} to s3 {}", localRootFolder, remoteFolder);
 			localToS3Sync(remoteFolder, localRootFolder);
+			logger.info("[[INFO]] Run startup synchronization from s3 {} to local {}", remoteFolder, localRootFolder);
 			s3toLocalSync(remoteFolder, localRootFolder);
 		} catch (IOException e) {
 			throw new InternalServerErrorException(ErrorMessage.E500_SYNC_ERROR,
@@ -98,12 +112,16 @@ public class SynchronizationService {
 			File file = path.toFile();
 			if (file.isFile() && file.canRead() && FileUtils.notMatchFilters(exclusionPatterns.get(localRootFolder),
 					path.toString().replaceFirst(localRootFolder, ""))) {
-				// FIXME: apply regex filters here
 				String relativePath = file.getAbsolutePath().replaceFirst(localRootFolder, "");
 				if (!mapItems.containsKey(relativePath) || (mapItems.containsKey(relativePath)
 						&& mapItems.get(relativePath).getLastUpdate() < file.lastModified())) {
+					logger.trace("[[TRACE]] Uploading file {}", path.toString());
 					uploadService.upload(path, relativePath, remoteFolder, mapItems.get(relativePath));
+				} else {
+					logger.debug("[[DEBUG]] {} will not be synchronized because it is oldest than the remote one",path.toString());
 				}
+			} else {
+				logger.debug("[[DEBUG]] {} will not be synchronized because missing prerequisite (e.g. exclusion pattern)", path.toString());
 			}
 		});
 	}
@@ -130,7 +148,7 @@ public class SynchronizationService {
 					if (item.getUploadedBy().equals(UserSpecificPropertiesManager.getConfiguration().getAlias())) {
 						// deleted items -> uploaded by current user but not found on local machine
 						if (!Path.of(localRootFolder + item.getOriginalName()).toFile().exists()) {
-							if(!uploadService.delete(remoteFolder, item.getOriginalName())) {
+							if (!uploadService.delete(remoteFolder, item.getOriginalName())) {
 								System.out.println("Error deleting s3 file");
 							}
 						}
@@ -237,7 +255,7 @@ public class SynchronizationService {
 					} else {
 						exclusionPatterns = new ArrayList<>();
 					}
-				} 
+				}
 
 			}
 			if (exclusionPatterns != null && syncFolder != null) {
@@ -266,8 +284,8 @@ public class SynchronizationService {
 				patterns.remove(foundPattern);
 			}
 		}
-		
-		if(foundPattern != null) {
+
+		if (foundPattern != null) {
 			AttachedClient currentUser = UserSpecificPropertiesManager.getConfiguration();
 			for (SyncFolder folder : currentUser.getSyncFolder()) {
 				if (folder.getLocalPath().equals(localFolder)) {

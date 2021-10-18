@@ -123,35 +123,43 @@ public class ManageFolderService {
 	public RemoveFolderResponse removeFolder(String remoteFolder) {
 		String localFolder = synchronizationService.getSynchronizedLocalRootFolderByRemoteFolder(remoteFolder);
 		if(localFolder != null) {
+			logger.info("[[INFO]] Removing synchronization folder {}", remoteFolder);
 			synchronizationService.removeSynchronizationFolder(localFolder);			
 			return new RemoveFolderResponse();
 		} else {
+			logger.error("[[ERROR]] Synchronization folder {} not found", remoteFolder);
 			throw new InternalServerErrorException(ErrorMessage.E500_GENERIC_ERROR);
 		}
 	}
 
 	public AddExclusionPatterResponse addExclusionPattern(String regexp, String remoteFolder) {
+		logger.info("[[INFO]] Adding exclusion pattern {} from remote folder {}", regexp, remoteFolder);
 		String localFolder = synchronizationService.getSynchronizedLocalRootFolderByRemoteFolder(remoteFolder);
 		if(localFolder != null) {
 			List<String> patterns = synchronizationService.addSynchronizationExclusionPattern(localFolder, regexp);
+			logger.debug("[[DEBUG]] Added pattern {} from folder {}", regexp, remoteFolder);
 			AddExclusionPatterResponse response = new AddExclusionPatterResponse();
 			response.setPatterns(patterns);
 			response.setLocalFolder(localFolder);
 			response.setRemoteFolder(remoteFolder);
 			return response;
 		} else {
+			logger.debug("[[DEBUG]] LocalFolder not found for remote folder {}", remoteFolder);
 			throw new InternalServerErrorException(ErrorMessage.E500_GENERIC_ERROR);
 		}		
 	}
 
 	public RemoveExclusionPatterResponse removeExclusionPattern(String regExp, String remoteFolder) {
+		logger.info("[[INFO]] Removing exclusion pattern {} from remote folder {}", regExp, remoteFolder);
 		String localFolder = synchronizationService.getSynchronizedLocalRootFolderByRemoteFolder(remoteFolder);
 		if(localFolder != null) {
 			List<String> patterns = synchronizationService.removeSynchronizationExclusionPattern(localFolder, regExp);
+			logger.debug("[[DEBUG]] Removing pattern {} from folder {}", regExp, remoteFolder);			
 			RemoveExclusionPatterResponse response = new RemoveExclusionPatterResponse();
 			response.setExclusionPatterns(patterns);
 			return response;
 		} else {
+			logger.debug("[[DEBUG]] LocalFolder not found for remote folder {}", remoteFolder);
 			throw new InternalServerErrorException(ErrorMessage.E500_GENERIC_ERROR);
 		}		
 	}
@@ -160,8 +168,10 @@ public class ManageFolderService {
 		ListRemoteFolderResponse response = new ListRemoteFolderResponse();
 		List<SharedData> data = mongoOperations.findAll(SharedData.class);
 		if(data.size() != 1) {
+			logger.debug("[[DEBUG]] Shared Folders is empty");
 			response.setRemoteFolder(new ArrayList<>());
 		} else {
+			logger.debug("[[DEBUG]] Shared Folders size: {}", data.get(0).getRemoteFolders().size());
 			response.setRemoteFolder(data.get(0).getRemoteFolders());
 		}
 		return response;
