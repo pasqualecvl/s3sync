@@ -29,7 +29,7 @@ public class WatchListeners {
 				localRootFolder);
 		Thread thread = new Thread(listener);
 		thread.start();
-		logger.info("[[INFO]] Starting watch thread {} on local/remote folders {}/{}", thread.getName(),
+		logger.info("[[INFO]] Starting watch thread {} on local/remote folders {} -> {}", thread.getName(),
 				localRootFolder, remoteFolder);
 		threadPool.put(localRootFolder, thread);
 		logger.debug("[[DEBUG]] ThreadPool current size: {}", threadPool.size());

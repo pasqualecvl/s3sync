@@ -52,7 +52,7 @@ public class ManageFolderService {
 			}
 		}
 		if (foundFolder == null) {
-			logger.info("[[INFO]] Add folder {} to s3 {}", localPath, remotePath);
+			logger.info("[[INFO]] Add folder {} -> {}", localPath, remotePath);
 			synchronizationService.synchronize(remotePath, localPath);
 			synchronizationService.cacheSynchronizationFolder(remotePath, localPath);
 			addToPersistence(client, localPath, remotePath);
@@ -97,7 +97,7 @@ public class ManageFolderService {
 	}
 
 	private void startListenerThread(String remoteFolder, String localRootFolder) {
-		logger.debug("[[DEBUG]] Starting listener on {}/{}", localRootFolder, remoteFolder);
+		logger.debug("[[DEBUG]] Starting listener on {} -> {}", localRootFolder, remoteFolder);
 		WatchListeners.startThread(uploadService, synchronizationService, remoteFolder, localRootFolder);
 	}
 

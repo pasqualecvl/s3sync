@@ -48,7 +48,7 @@ public class AmqpSyncListener {
 						if (localFileLastModified <= dto.getTime()) {
 							FileUtils.deleteFileAndEmptyTree(localFolder + dto.getFile());
 						} else {
-							logger.info("Local file is newer than the remote one: " + localFileLastModified + " -> " + dto.getTime());
+							logger.info("Local file is newer than the remote one: {} -> {}", localFileLastModified, dto.getTime());
 						}
 					}
 				}				
