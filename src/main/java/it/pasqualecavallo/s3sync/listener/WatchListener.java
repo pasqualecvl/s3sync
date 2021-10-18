@@ -17,6 +17,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,7 +77,8 @@ public class WatchListener implements Runnable {
 				// Operation locked by batch processes (like startup synchonization, batch
 				// synchronization, etc)
 				if (WatchListeners.threadNotLocked()) {
-					WatchKey watchKey = watchService.take();
+					//Timeout needed because sometimes maps must be reloaded
+					WatchKey watchKey = watchService.poll(60, TimeUnit.SECONDS);
 					if (watchKey != null) {
 						for (WatchEvent<?> event : watchKey.pollEvents()) {
 							logger.debug("[[DEBUG]] Managing event {}", event.toString());

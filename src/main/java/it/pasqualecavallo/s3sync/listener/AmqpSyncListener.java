@@ -45,14 +45,16 @@ public class AmqpSyncListener {
 					if (S3Action.CREATE.equals(dto.getS3Action()) || S3Action.MODIFY.equals(dto.getS3Action())) {
 						List<String> folders = uploadService.getOrUpdate(localFolder + dto.getFile(), dto.getRemoteFolder() + dto.getFile());
 						for(String folder : folders) {
-							new Thread(new AddNewWatchKey(folder)).start();							
+							//start as separate thread to prevent lock (the thread is probably waiting for watchService.poll operation
+							new Thread(new AddNewWatchKey(localFolder, folder)).start();							
 						}
 					} else if (S3Action.DELETE.equals(dto.getS3Action())) {
 						long localFileLastModified = Path.of(localFolder + dto.getFile()).toFile().lastModified();
 						if (localFileLastModified <= dto.getTime()) {
 							List<String> deleted = FileUtils.deleteFileAndEmptyTree(localFolder + dto.getFile());
 							for(String s : deleted) {
-								new Thread(new RemoveWatchKey(s)).start();
+								//start as separate thread to prevent lock (the thread is probably waiting for watchService.poll operation
+								new Thread(new RemoveWatchKey(localFolder, s)).start();
 							}
 						} else {
 							logger.info("Local file is newer than the remote one: {} -> {}", localFileLastModified, dto.getTime());
@@ -71,28 +73,32 @@ public class AmqpSyncListener {
 	public class AddNewWatchKey implements Runnable {
 
 		private String folder;
+		private String localRootFolder;
 		
-		public AddNewWatchKey(String folder) {
+		public AddNewWatchKey(String localRootFolder, String folder) {
 			this.folder = folder;
+			this.localRootFolder = localRootFolder;
 		}
 		
 		@Override
 		public void run() {
-			((WatchListener)WatchListeners.getThread(folder).getR()).addFolder(folder);
+			((WatchListener)WatchListeners.getThread(localRootFolder).getR()).addFolder(folder);
 		}
 	}
 	
 	public class RemoveWatchKey implements Runnable {
 		
 		private String folder;
-		
-		public RemoveWatchKey(String folder) {
+		private String localRootFolder;
+
+		public RemoveWatchKey(String localRootFolder, String folder) {
 			this.folder = folder;
+			this.localRootFolder = localRootFolder;
 		}
 		
 		@Override
 		public void run() {
-			((WatchListener)WatchListeners.getThread(folder).getR()).removeFolder(folder);
+			((WatchListener)WatchListeners.getThread(localRootFolder).getR()).removeFolder(folder);
 		}		
 	}
 

@@ -22,9 +22,6 @@ import it.pasqualecavallo.s3sync.utils.UserSpecificPropertiesManager;
 public class StartListenerService {
 
 	@Autowired
-	private MongoOperations mongoOperations;
-
-	@Autowired
 	private UploadService uploadService;
 
 	@Autowired
@@ -51,7 +48,6 @@ public class StartListenerService {
 			WatchListeners.startThread(uploadService, synchronizationService, folder.getRemotePath(),
 					folder.getLocalPath());
 		}
-
 	}
 
 	@Scheduled(fixedDelay = 60000)
