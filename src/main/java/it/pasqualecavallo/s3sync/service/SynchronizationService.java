@@ -236,6 +236,10 @@ public class SynchronizationService {
 		List<String> toReturn = new ArrayList<>();
 		List<Pattern> patterns = exclusionPatterns.get(localFolder);
 		boolean present = false;
+		if(patterns == null) {
+			patterns = Collections.synchronizedList(new ArrayList<>());
+			exclusionPatterns.put(localFolder, patterns);
+		}
 		for (Pattern pattern : patterns) {
 			String patternString = pattern.toString();
 			toReturn.add(patternString);
