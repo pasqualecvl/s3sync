@@ -107,16 +107,17 @@ public class UploadService {
 
 	}
 
-	public void getOrUpdate(String localFullPathFolder, String remoteFullPathFolder) {
+	public String[] getOrUpdate(String localFullPathFolder, String remoteFullPathFolder) {
 		logger.info("[[INFO]] Fetch or update file {} from remote folder {}", localFullPathFolder, remoteFullPathFolder);
 		GetObjectRequest request = GetObjectRequest.builder().bucket(GlobalPropertiesManager.getProperty("s3.bucket"))
 				.key(remoteFullPathFolder).build();
 		ResponseInputStream<GetObjectResponse> response = s3Client.getObject(request);
 		try {
 			logger.debug("[[DEBUG]] Creating folder tree for file {}", localFullPathFolder);
-			FileUtils.createFileTree(localFullPathFolder, response.readAllBytes());
+			return FileUtils.createFileTree(localFullPathFolder, response.readAllBytes());
 		} catch (IOException e) {
 			logger.error("Exception", e);
+			throw new RuntimeException(e);
 		}
 	}
 

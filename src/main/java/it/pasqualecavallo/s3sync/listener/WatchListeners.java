@@ -15,7 +15,7 @@ import it.pasqualecavallo.s3sync.service.UploadService;
 
 public class WatchListeners {
 
-	private static Map<String, Thread> threadPool = new HashMap<>();
+	private static Map<String, ThreadAndRunnable> threadPool = new HashMap<>();
 
 	private static volatile Map<String, Collection<String>> changesWhileLocked = new HashMap<>();
 
@@ -31,13 +31,13 @@ public class WatchListeners {
 		thread.start();
 		logger.info("[[INFO]] Starting watch thread {} on local/remote folders {} -> {}", thread.getName(),
 				localRootFolder, remoteFolder);
-		threadPool.put(localRootFolder, thread);
+		threadPool.put(localRootFolder, new ThreadAndRunnable(thread, listener));
 		logger.debug("[[DEBUG]] ThreadPool current size: {}", threadPool.size());
 	}
 
 	public static void stopThread(String localRootFolder) {
 		if (threadPool.get(localRootFolder) != null) {
-			threadPool.get(localRootFolder).interrupt();
+			threadPool.get(localRootFolder).getT().interrupt();
 			threadPool.remove(localRootFolder);
 		}
 	}
@@ -46,12 +46,16 @@ public class WatchListeners {
 		if(!logger.isDebugEnabled()) {
 			logger.info("[[INFO]] Listeners watching for #{} folders", WatchListeners.threadPool.size());			
 		} else {
-			for(Entry<String, Thread> item : WatchListeners.threadPool.entrySet()) {
-				logger.debug("[[DEBUG]] Folder {} watched by thread {}", item.getKey(), item.getValue().getName());
+			for(Entry<String, ThreadAndRunnable> item : WatchListeners.threadPool.entrySet()) {
+				logger.debug("[[DEBUG]] Folder {} watched by thread {}", item.getKey(), item.getValue().getT().getName());
 			}
 		}
 	}
 
+	public static ThreadAndRunnable getThread(String localRootFolder) {
+		return threadPool.get(localRootFolder);
+	}
+	
 	public static void lockSemaphore() {
 		logger.debug("[[DEBUG]] Semaphore change from {} to {}", WatchListeners.threadSemaphore, WatchListeners.threadSemaphore + 1);
 		WatchListeners.threadSemaphore++;
@@ -105,6 +109,33 @@ public class WatchListeners {
 	public static void cleanChangesWhileLocked(String syncFolder) {
 		synchronized (changesWhileLocked) {
 			changesWhileLocked.put(syncFolder, new ArrayList<>());
+		}
+	}
+	
+	public static class ThreadAndRunnable {
+		
+		public ThreadAndRunnable(Thread t, Runnable r) {
+			this.t = t;
+			this.r = r;
+		}
+		
+		private Thread t;
+		private Runnable r;
+		
+		public Thread getT() {
+			return t;
+		}
+		
+		public void setT(Thread t) {
+			this.t = t;
+		}
+		
+		public Runnable getR() {
+			return r;
+		}
+		
+		public void setR(Runnable r) {
+			this.r = r;
 		}
 	}
 }

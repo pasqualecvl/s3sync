@@ -158,5 +158,30 @@ public class WatchListener implements Runnable {
 			logger.info("[[DEBUG]] Event on file {} was skipped by regexp filters.", fullLocation);
 		}
 	}
+	
+	public void addFolder(String fullLocation) {
+		Path path = Path.of(fullLocation);
+		synchronized(watchKeys) {		
+			if(!watchKeys.containsKey(fullLocation)) {
+				try {
+					watchKeys.put(fullLocation, path.register(watchService,
+							new WatchEvent.Kind[] { StandardWatchEventKinds.ENTRY_CREATE,
+									StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_MODIFY,
+									StandardWatchEventKinds.OVERFLOW },
+							SensitivityWatchEventModifier.MEDIUM));
+				} catch (IOException e) {
+					throw new RuntimeException(e);
+				}
+				directories.add(fullLocation);				
+			}
+		}
+	}
+	
+	public void removeFolder(String fullLocation) {
+		synchronized(watchKeys) {
+			watchKeys.remove(fullLocation);
+		}
+		directories.remove(fullLocation);
+	}
 
 }

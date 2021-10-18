@@ -1,6 +1,7 @@
 package it.pasqualecavallo.s3sync.listener;
 
 import java.nio.file.Path;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,11 +43,17 @@ public class AmqpSyncListener {
 					WatchListeners.putChangesWhileLocked(localFolder, dto.getFile());
 					logger.info("Serving action: " + dto.toString());
 					if (S3Action.CREATE.equals(dto.getS3Action()) || S3Action.MODIFY.equals(dto.getS3Action())) {
-						uploadService.getOrUpdate(localFolder + dto.getFile(), dto.getRemoteFolder() + dto.getFile());
+						String[] folders = uploadService.getOrUpdate(localFolder + dto.getFile(), dto.getRemoteFolder() + dto.getFile());
+						for(String folder : folders) {
+							new Thread(new AddNewWatchKey(folder)).start();							
+						}
 					} else if (S3Action.DELETE.equals(dto.getS3Action())) {
 						long localFileLastModified = Path.of(localFolder + dto.getFile()).toFile().lastModified();
 						if (localFileLastModified <= dto.getTime()) {
-							FileUtils.deleteFileAndEmptyTree(localFolder + dto.getFile());
+							List<String> deleted = FileUtils.deleteFileAndEmptyTree(localFolder + dto.getFile());
+							for(String s : deleted) {
+								new Thread(new RemoveWatchKey(s)).start();
+							}
 						} else {
 							logger.info("Local file is newer than the remote one: {} -> {}", localFileLastModified, dto.getTime());
 						}
@@ -59,6 +66,34 @@ public class AmqpSyncListener {
 			logger.info("Release semaphore");
 			WatchListeners.releaseSemaphore();
 		}
+	}
+	
+	public class AddNewWatchKey implements Runnable {
+
+		private String folder;
+		
+		public AddNewWatchKey(String folder) {
+			this.folder = folder;
+		}
+		
+		@Override
+		public void run() {
+			((WatchListener)WatchListeners.getThread(folder).getR()).addFolder(folder);
+		}
+	}
+	
+	public class RemoveWatchKey implements Runnable {
+		
+		private String folder;
+		
+		public RemoveWatchKey(String folder) {
+			this.folder = folder;
+		}
+		
+		@Override
+		public void run() {
+			((WatchListener)WatchListeners.getThread(folder).getR()).removeFolder(folder);
+		}		
 	}
 
 }
