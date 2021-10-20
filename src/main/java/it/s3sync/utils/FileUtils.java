@@ -44,7 +44,7 @@ public class FileUtils {
 		return folders;
 	}
 
-	public static List<String> deleteFileAndEmptyTree(String fullPath) {
+	public static List<String> toDeleteFileAndEmptyTree(String fullPath) {
 		List<String> deleteFolders = new ArrayList<>();
 		Path leafPath = Paths.get(fullPath);
 		try {
@@ -52,18 +52,17 @@ public class FileUtils {
 			do {
 				if (leafPath.getParent().toFile().listFiles().length == 0) {
 					deleteFolders.add(leafPath.getParent().toString());
-					Files.delete(leafPath.getParent());
 					leafPath = leafPath.getParent();
 				} else {
 					break;
 				}
 			} while (!leafPath.getParent().toString().equals("/"));
 		} catch (IOException e) {
-			System.err.println(e);
+			logger.error("Exception", e);
 		}
 		return deleteFolders;
 	}
-	
+		
 	private static String[] tokenize(String fullPath) {
 		List<Integer> delimiterPosition = new ArrayList<>();
 		for (int i = 0; i < fullPath.length(); i++) {

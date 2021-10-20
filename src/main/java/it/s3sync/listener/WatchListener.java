@@ -192,6 +192,11 @@ public class WatchListener implements Runnable {
 			watchKeys.remove(fullLocation);
 		}
 		directories.remove(fullLocation);
+		try {
+			Files.delete(Path.of(fullLocation));
+		} catch(Exception e) {
+			logger.error("[[ERROR]] Exception deleting folder {}", fullLocation, e);
+		}
 	}
 
 }

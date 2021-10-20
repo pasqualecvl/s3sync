@@ -51,8 +51,8 @@ public class AmqpSyncListener {
 					} else if (S3Action.DELETE.equals(dto.getS3Action())) {
 						long localFileLastModified = Path.of(localFolder + dto.getFile()).toFile().lastModified();
 						if (localFileLastModified <= dto.getTime()) {
-							List<String> deleted = FileUtils.deleteFileAndEmptyTree(localFolder + dto.getFile());
-							for(String s : deleted) {
+							List<String> toDelete = FileUtils.toDeleteFileAndEmptyTree(localFolder + dto.getFile());
+							for(String s : toDelete) {
 								//start as separate thread to prevent lock (the thread is probably waiting for watchService.poll operation
 								new Thread(new RemoveWatchKey(localFolder, s)).start();
 							}

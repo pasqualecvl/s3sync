@@ -134,7 +134,7 @@ public class SynchronizationService {
 			if (!localRootFolder.endsWith("/") && !item.getOriginalName().startsWith("/")) {
 				localRootFolder = localRootFolder + "/";
 			}
-			if(!FileUtils.notMatchFilters(exclusionPatterns.get(localRootFolder),
+			if(FileUtils.notMatchFilters(exclusionPatterns.get(localRootFolder),
 					item.getOriginalName())) {
 				String itemLocalFullLocation = localRootFolder + item.getOriginalName();
 				logger.trace("[[TRACE]] Serving item {}", itemLocalFullLocation);

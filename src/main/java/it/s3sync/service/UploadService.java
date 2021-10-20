@@ -94,8 +94,7 @@ public class UploadService {
 				amqpTemplate.convertAndSend(dto);
 			}
 		} catch (UncheckedIOException e) {
-			// File removed
-			System.err.println("File removed");
+			logger.error("[[ERROR]] Exception removing file {}", relativePath, e);
 		}
 	}
 
@@ -214,7 +213,7 @@ public class UploadService {
 						Item.class);
 				toDelete.forEach(item -> {
 					if(!delete(item.getOwnedByFolder(), item.getOriginalName())) {
-						System.out.println("Error deleting S3 file");
+						logger.error("Error deleting S3 file");
 					}
 				});
 			} else {

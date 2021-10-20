@@ -6,6 +6,9 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.fasterxml.jackson.databind.json.JsonMapper;
 
 import it.s3sync.model.AttachedClient;
@@ -13,6 +16,8 @@ import it.s3sync.model.AttachedClient;
 public class UserSpecificPropertiesManager {
 
 	private static JsonMapper mapper = new JsonMapper();
+	
+	private static final Logger logger = LoggerFactory.getLogger(UserSpecificPropertiesManager.class);
 	
 	static {
 		String userHome = System.getProperty("user.home");
@@ -30,7 +35,7 @@ public class UserSpecificPropertiesManager {
 				confWriter.write(mapper.writeValueAsString(client));
 				confWriter.close();
 			} catch (IOException e1) {
-				System.err.println("Cannot create configuration file");
+				logger.error("[[ERROR]] Cannot create configuration file", e);
 			}
 		}
 	}
@@ -40,7 +45,7 @@ public class UserSpecificPropertiesManager {
 		try (FileInputStream inputStream = new FileInputStream(userHome + "/.s3sync.conf")) {
 			return mapper.readValue(inputStream.readAllBytes(), AttachedClient.class);
 		} catch(Exception e) {
-			throw new RuntimeException("Can't read configuration file");
+			throw new RuntimeException("Can't read configuration file", e);
 		}
 	}
 
@@ -50,7 +55,7 @@ public class UserSpecificPropertiesManager {
 		try (FileWriter confWriter = new FileWriter(file)){
 			confWriter.write(mapper.writeValueAsString(attachedClient));
 		} catch (IOException e) {
-			throw new RuntimeException("Can't write configuration file");
+			throw new RuntimeException("Can't write configuration file", e);
 		}
 	}
 	
