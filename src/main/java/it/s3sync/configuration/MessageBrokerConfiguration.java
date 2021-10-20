@@ -1,5 +1,8 @@
 package it.s3sync.configuration;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.springframework.amqp.core.AmqpTemplate;
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
@@ -22,7 +25,8 @@ public class MessageBrokerConfiguration {
 
 	@Bean
 	public ConnectionFactory connectionFactory() {
-		CachingConnectionFactory connectionFactory = new CachingConnectionFactory(GlobalPropertiesManager.getProperty("amqp.url"));
+		CachingConnectionFactory connectionFactory = new CachingConnectionFactory(
+				GlobalPropertiesManager.getProperty("amqp.url"));
 		connectionFactory.setUsername(GlobalPropertiesManager.getProperty("amqp.user"));
 		connectionFactory.setPassword(GlobalPropertiesManager.getProperty("amqp.password"));
 		connectionFactory.setVirtualHost(GlobalPropertiesManager.getProperty("amqp.vhost"));
@@ -31,8 +35,10 @@ public class MessageBrokerConfiguration {
 
 	@Bean
 	public Queue queue() {
+		Map<String, Object> args = new HashMap<String, Object>();
+		args.put("x-message-ttl", 3000);
 		return new Queue(GlobalPropertiesManager.getProperty("amqp.queue") + "_" +
-				UserSpecificPropertiesManager.getConfiguration().getAlias(), false, false, false, null);
+				UserSpecificPropertiesManager.getConfiguration().getAlias(), false, false, false, args);
 	}
 
 	@Bean
@@ -42,9 +48,7 @@ public class MessageBrokerConfiguration {
 
 	@Bean
 	public Binding binding() {
-		return BindingBuilder
-				.bind(queue())
-				.to(fanoutExchange());
+		return BindingBuilder.bind(queue()).to(fanoutExchange());
 	}
 
 	@Bean
@@ -52,17 +56,17 @@ public class MessageBrokerConfiguration {
 			MessageListenerAdapter listenerAdapter) {
 		SimpleMessageListenerContainer container = new SimpleMessageListenerContainer();
 		container.setConnectionFactory(connectionFactory);
-		container.setQueueNames(GlobalPropertiesManager.getProperty("amqp.queue") + "_" +
-				UserSpecificPropertiesManager.getConfiguration().getAlias());
+		container.setQueueNames(GlobalPropertiesManager.getProperty("amqp.queue") + "_"
+				+ UserSpecificPropertiesManager.getConfiguration().getAlias());
 		container.setMessageListener(listenerAdapter);
 		return container;
 	}
-	
+
 	@Bean
 	public MessageListenerAdapter messageListenerAdapter(AmqpSyncListener amqpSyncListener) {
 		return new MessageListenerAdapter(amqpSyncListener, "receiveSyncMessage");
 	}
-	
+
 	@Bean
 	public AmqpTemplate amqpTemplate() {
 		RabbitTemplate template = new RabbitTemplate(connectionFactory());
