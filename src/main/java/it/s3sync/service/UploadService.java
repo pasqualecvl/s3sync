@@ -63,7 +63,7 @@ public class UploadService {
 	
 	private static final Logger logger = LoggerFactory.getLogger(UploadService.class);
 
-	public void upload(Path path, String relativePath, String remoteFolder, Item item) {
+	public void upload(Path path, String relativePath, String remoteFolder, Item item, Long lastModified) {
 		logger.debug("Uploading {} to s3 folder {} with relative path {}", path, remoteFolder, relativePath);
 		try {
 			PutObjectRequest objectRequest = PutObjectRequest.builder()
@@ -80,7 +80,7 @@ public class UploadService {
 					item.setOwnedByFolder(remoteFolder);
 				}
 				item.setDeleted(false);
-				item.setLastUpdate(System.currentTimeMillis());
+				item.setLastUpdate(lastModified);
 				item.setUploadedBy(UserSpecificPropertiesManager.getConfiguration().getAlias());
 				logger.trace("[[TRACE]] Writing item on mongo: {}", item);
 				mongoOperations.save(item);
@@ -89,6 +89,7 @@ public class UploadService {
 				dto.setRemoteFolder(remoteFolder);
 				dto.setSource(UserSpecificPropertiesManager.getConfiguration().getAlias());
 				dto.setS3Action(isCreate ? S3Action.CREATE : S3Action.MODIFY);
+				dto.setTime(lastModified);
 				logger.debug("[[DEBUG]] Sending fanout notification through MQ");
 				logger.trace("[[TRACE]] MQ Dto content: {}", dto);
 				amqpTemplate.convertAndSend(dto);
@@ -98,22 +99,22 @@ public class UploadService {
 		}
 	}
 
-	public void upload(Path path, String remoteFolder, String relativePath) {
+	public void upload(Path path, String remoteFolder, String relativePath, Long lastModified) {
 		Item item = mongoOperations.findOne(
 				new Query(Criteria.where("ownedByFolder").is(remoteFolder).and("originalName").is(relativePath)),
 				Item.class);
-		upload(path, relativePath, remoteFolder, item);
+		upload(path, relativePath, remoteFolder, item, lastModified);
 
 	}
 
-	public List<String> getOrUpdate(String localFullPathFolder, String remoteFullPathFolder) {
+	public List<String> getOrUpdate(String localFullPathFolder, String remoteFullPathFolder, long lastModified) {
 		logger.info("[[INFO]] Fetch or update file {} from remote folder {}", localFullPathFolder, remoteFullPathFolder);
 		GetObjectRequest request = GetObjectRequest.builder().bucket(GlobalPropertiesManager.getProperty("s3.bucket"))
 				.key(remoteFullPathFolder).build();
 		ResponseInputStream<GetObjectResponse> response = s3Client.getObject(request);
 		try {
 			logger.debug("[[DEBUG]] Creating folder tree for file {}", localFullPathFolder);
-			return FileUtils.createFileTree(localFullPathFolder, response.readAllBytes());
+			return FileUtils.createFileTree(localFullPathFolder, response.readAllBytes(), lastModified);
 		} catch (IOException e) {
 			logger.error("Exception", e);
 			throw new RuntimeException(e);

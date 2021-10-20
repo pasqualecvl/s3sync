@@ -43,7 +43,7 @@ public class AmqpSyncListener {
 					WatchListeners.putChangesWhileLocked(localFolder, dto.getFile());
 					logger.info("Serving action: " + dto.toString());
 					if (S3Action.CREATE.equals(dto.getS3Action()) || S3Action.MODIFY.equals(dto.getS3Action())) {
-						List<String> folders = uploadService.getOrUpdate(localFolder + dto.getFile(), dto.getRemoteFolder() + dto.getFile());
+						List<String> folders = uploadService.getOrUpdate(localFolder + dto.getFile(), dto.getRemoteFolder() + dto.getFile(), dto.getTime());
 						for(String folder : folders) {
 							//start as separate thread to prevent lock (the thread is probably waiting for watchService.poll operation
 							new Thread(new AddNewWatchKey(localFolder, folder)).start();							

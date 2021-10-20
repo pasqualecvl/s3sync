@@ -116,7 +116,12 @@ public class SynchronizationService {
 				if (!mapItems.containsKey(relativePath) || (mapItems.containsKey(relativePath)
 						&& mapItems.get(relativePath).getLastUpdate() < file.lastModified())) {
 					logger.trace("[[TRACE]] Uploading file {}", path.toString());
-					uploadService.upload(path, relativePath, remoteFolder, mapItems.get(relativePath));
+					try {
+						uploadService.upload(path, relativePath, remoteFolder, mapItems.get(relativePath),
+							Files.getLastModifiedTime(path).toMillis());
+					} catch (IOException e) {
+						logger.error("[[ERROR]] Cannot upload file {}", path.toString(), e);
+					}
 				} else {
 					logger.debug("[[DEBUG]] {} will not be uploaded because it is oldest than the remote one",path.toString());
 				}
@@ -170,7 +175,7 @@ public class SynchronizationService {
 								logger.debug("[[DEBUG]] File {} is out to date, updating...", itemLocalFullLocation);
 								// file is obsolete, go for update
 								uploadService.getOrUpdate(itemLocalFullLocation,
-										item.getOwnedByFolder() + item.getOriginalName());
+										item.getOwnedByFolder() + item.getOriginalName(), item.getLastUpdate());
 								// update created file last modified to prevent synchronization loop
 								try {
 									logger.debug("[[DEBUG]] Setting file {} last modified same as the remote one: {}", itemLocalFullLocation, item.getLastUpdate());
@@ -181,7 +186,8 @@ public class SynchronizationService {
 							}
 						} else {
 							logger.debug("File {}/{} not found in the local folder {}", remoteFolder, item.getOriginalName(), localRootFolder);
-							uploadService.getOrUpdate(itemLocalFullLocation, item.getOwnedByFolder() + item.getOriginalName());
+							uploadService.getOrUpdate(itemLocalFullLocation, item.getOwnedByFolder() + item.getOriginalName(),
+									item.getLastUpdate());
 							try {
 								logger.debug("[[DEBUG]] Setting file {} last modified same as the remote one: {}", itemLocalFullLocation, item.getLastUpdate());
 								Files.setLastModifiedTime(itemLocalFullPath, FileTime.fromMillis(item.getLastUpdate()));

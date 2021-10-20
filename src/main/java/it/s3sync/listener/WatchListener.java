@@ -77,21 +77,26 @@ public class WatchListener implements Runnable {
 				// Operation locked by batch processes (like startup synchonization, batch
 				// synchronization, etc)
 				if (WatchListeners.threadNotLocked()) {
-					//Timeout needed because sometimes maps must be reloaded
+					// Timeout needed because sometimes maps must be reloaded
 					WatchKey watchKey = watchService.poll(60, TimeUnit.SECONDS);
 					if (watchKey != null) {
 						for (WatchEvent<?> event : watchKey.pollEvents()) {
 							logger.debug("[[DEBUG]] Managing event {}", event.toString());
-							managingEvent(event, watchKey.watchable());
+							try {
+								managingEvent(event, watchKey.watchable());
+							} catch (Exception e) {
+								logger.error("[[ERROR]] Exception managing event {}/{}, proceed with next",
+										event.kind(), watchKey.watchable().toString());
+							}
+							watchKey.reset();
 						}
-						watchKey.reset();
 					}
 				} else {
 					logger.debug("[[DEBUG]] Thread on {} currently locked by semaphore, wait 1000ms", localRootFolder);
 					Thread.sleep(1000);
 				}
 			}
-		} catch (IOException | InterruptedException e) {
+		} catch (Exception e) {
 			throw new RuntimeException("[[ERROR]]Cannot start listening thread", e);
 		}
 	}
@@ -103,12 +108,14 @@ public class WatchListener implements Runnable {
 		if (WatchListeners.checkForProgrammaticallyChange(localRootFolder,
 				fullLocation.replaceFirst(localRootFolder, ""))) {
 			logger.info("[[INFO]] Event on {} for file {} was made by s3sync. Skipped.", localRootFolder, fullLocation);
+
 			return;
 		}
 		Path fullPath = Path.of(fullLocation);
 		if (FileUtils.notMatchFilters(synchronizationService.getExclusionPattern(localRootFolder), fullLocation)) {
 			switch (event.kind().name()) {
 			case "ENTRY_CREATE":
+			case "ENTRY_MODIFY":
 				logger.debug("[[DEBUG]] Managing event CREATED on file {}", fullLocation);
 				if (fullPath.toFile().isDirectory()) {
 					logger.debug("[[DEBUG]] CREATE event on folder {}", fullLocation);
@@ -126,11 +133,11 @@ public class WatchListener implements Runnable {
 					}
 					break;
 				}
-			case "ENTRY_MODIFY":
 				logger.debug("[[DEBUG]] Managing event CREATE/MODIFY on file {}, start upload", fullLocation);
 				try {
-					uploadService.upload(fullPath, remoteFolder, fullLocation.replaceFirst(localRootFolder, ""));
-				} catch(Exception e) {
+					uploadService.upload(fullPath, remoteFolder, fullLocation.replaceFirst(localRootFolder, ""),
+							Files.getLastModifiedTime(fullPath).toMillis());
+				} catch (Exception e) {
 					logger.error("Exception saving file {}", fullLocation, e);
 				}
 				break;
@@ -150,7 +157,7 @@ public class WatchListener implements Runnable {
 						uploadService.deleteAsFolder(remoteFolder, fullLocation.replaceFirst(localRootFolder, ""));
 						logger.debug("[[DEBUG]] Remove folder {} from the folders tree");
 						directories.remove(fullLocation);
-					} catch(Exception e) {
+					} catch (Exception e) {
 						logger.error("Exception removing file {}", fullLocation, e);
 					}
 				} else {
@@ -168,33 +175,34 @@ public class WatchListener implements Runnable {
 			logger.info("[[DEBUG]] Event on file {} was skipped by regexp filters.", fullLocation);
 		}
 	}
-	
+
 	public void addFolder(String fullLocation) {
 		Path path = Path.of(fullLocation);
-		synchronized(watchKeys) {		
-			if(!watchKeys.containsKey(fullLocation)) {
+		synchronized (watchKeys) {
+			if (!watchKeys.containsKey(fullLocation)) {
 				try {
-					watchKeys.put(fullLocation, path.register(watchService,
-							new WatchEvent.Kind[] { StandardWatchEventKinds.ENTRY_CREATE,
-									StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_MODIFY,
-									StandardWatchEventKinds.OVERFLOW },
-							SensitivityWatchEventModifier.MEDIUM));
+					watchKeys.put(fullLocation,
+							path.register(watchService,
+									new WatchEvent.Kind[] { StandardWatchEventKinds.ENTRY_CREATE,
+											StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_MODIFY,
+											StandardWatchEventKinds.OVERFLOW },
+									SensitivityWatchEventModifier.MEDIUM));
 				} catch (IOException e) {
 					throw new RuntimeException(e);
 				}
-				directories.add(fullLocation);				
+				directories.add(fullLocation);
 			}
 		}
 	}
-	
+
 	public void removeFolder(String fullLocation) {
-		synchronized(watchKeys) {
+		synchronized (watchKeys) {
 			watchKeys.remove(fullLocation);
 		}
 		directories.remove(fullLocation);
 		try {
 			Files.delete(Path.of(fullLocation));
-		} catch(Exception e) {
+		} catch (Exception e) {
 			logger.error("[[ERROR]] Exception deleting folder {}", fullLocation, e);
 		}
 	}

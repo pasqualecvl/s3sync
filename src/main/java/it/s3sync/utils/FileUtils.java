@@ -5,9 +5,11 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
@@ -17,7 +19,7 @@ public class FileUtils {
 
 	private static final Logger logger = LoggerFactory.getLogger(FileUtils.class);
 	
-	public static List<String> createFileTree(String fullPath, byte[] content) throws IOException {
+	public static List<String> createFileTree(String fullPath, byte[] content, Long lastModified) throws IOException {
 		String[] tokenized = tokenize(fullPath);
 		List<String> folders = new ArrayList<>();
 		logger.trace("Tokenizing string: " + fullPath + " returns with " + Arrays.toString(tokenized));
@@ -41,6 +43,7 @@ public class FileUtils {
 		try (FileOutputStream fos = new FileOutputStream(fullPath)) {
 			  fos.write(content);
 		}
+		Files.setLastModifiedTime(Path.of(fullPath), FileTime.from(lastModified, TimeUnit.MILLISECONDS));
 		return folders;
 	}
 
