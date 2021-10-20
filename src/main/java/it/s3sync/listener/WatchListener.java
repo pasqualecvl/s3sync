@@ -13,8 +13,10 @@ import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.nio.file.Watchable;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -118,27 +120,36 @@ public class WatchListener implements Runnable {
 			case "ENTRY_MODIFY":
 				logger.debug("[[DEBUG]] Managing event CREATED on file {}", fullLocation);
 				if (fullPath.toFile().isDirectory()) {
+					List<Path> filesToUpload = new ArrayList<>();
 					logger.debug("[[DEBUG]] CREATE event on folder {}", fullLocation);
 					try {
-						watchKeys.put(fullLocation, fullPath.register(watchService,
-								new WatchEvent.Kind[] { StandardWatchEventKinds.ENTRY_CREATE,
-										StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_MODIFY,
-										StandardWatchEventKinds.OVERFLOW },
-								SensitivityWatchEventModifier.MEDIUM));
-						logger.debug("[[DEBUG]] Add watchKey on {}", fullLocation);
-						directories.add(fullLocation);
-						logger.debug("[[DEBUG]] Add {} to folder tree", fullLocation);
+						Files.walkFileTree(fullPath, new SimpleFileVisitor<Path>() {
+							@Override
+							public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+								logger.debug("[[DEBUG]] Add watchKey on {}", fullLocation);
+								watchKeys.put(dir.toString(),
+										dir.register(watchService,
+												new WatchEvent.Kind[] { StandardWatchEventKinds.ENTRY_CREATE,
+														StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_MODIFY,
+														StandardWatchEventKinds.OVERFLOW },
+												SensitivityWatchEventModifier.MEDIUM));
+								logger.debug("[[DEBUG]] Add {} to folder tree", fullLocation);
+								directories.add(dir.toString());
+								return FileVisitResult.CONTINUE;
+							}
+						});
+						uploadService.uploadAsFolder(fullPath, localRootFolder, remoteFolder);
 					} catch (IOException e) {
 						logger.error("Exception", e);
 					}
-					break;
-				}
-				logger.debug("[[DEBUG]] Managing event CREATE/MODIFY on file {}, start upload", fullLocation);
-				try {
-					uploadService.upload(fullPath, remoteFolder, fullLocation.replaceFirst(localRootFolder, ""),
-							Files.getLastModifiedTime(fullPath).toMillis());
-				} catch (Exception e) {
-					logger.error("Exception saving file {}", fullLocation, e);
+				} else {
+					logger.debug("[[DEBUG]] Managing event CREATE/MODIFY on file {}, start upload", fullLocation);
+					try {
+						uploadService.upload(fullPath, remoteFolder, fullLocation.replaceFirst(localRootFolder, ""),
+								Files.getLastModifiedTime(fullPath).toMillis());
+					} catch (Exception e) {
+						logger.error("Exception saving file {}", fullLocation, e);
+					}
 				}
 				break;
 			case "ENTRY_DELETE":
