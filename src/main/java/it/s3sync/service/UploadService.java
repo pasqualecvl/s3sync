@@ -260,7 +260,7 @@ public class UploadService {
 		Map<String, Item> toMatchMap = toMatch.stream().collect(Collectors.toMap(Item::getOriginalName, Item::get));
 
 		try {
-			Files.walk(Paths.get(localRootFolder)).forEach(path -> {
+			Files.walk(fullPath).forEach(path -> {
 				try {
 					long lastModified = 0L;
 					lastModified = Files.getLastModifiedTime(fullPath).toMillis();
