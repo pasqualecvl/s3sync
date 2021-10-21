@@ -25,10 +25,10 @@ public class AmqpSyncListener {
 	private JsonMapper jsonMapper;
 
 	private static final Logger logger = LoggerFactory.getLogger(AmqpSyncListener.class);
-	
+
 	@Autowired
 	private UploadService uploadService;
-	
+
 	@Autowired
 	private SynchronizationService synchronizationService;
 
@@ -36,31 +36,53 @@ public class AmqpSyncListener {
 		WatchListeners.lockSemaphore();
 		logger.info("Locking WatchListeners");
 		try {
-			if(!dto.getSource().equals(UserSpecificPropertiesManager.getConfiguration().getAlias())) {
+			if (!dto.getSource().equals(UserSpecificPropertiesManager.getConfiguration().getAlias())) {
 				String localFolder = synchronizationService
 						.getSynchronizedLocalRootFolderByRemoteFolder(dto.getRemoteFolder());
-				if(localFolder != null) {
-					WatchListeners.putChangesWhileLocked(localFolder, dto.getFile());
+				if (localFolder != null) {
+					// lock event on file
+					// FIXME: since watchKey will be create by a thread AFTER the file is
+					// downloaded, this could be useless
+					// TODO: check and eventually remove
+					// WatchListeners.putChangesWhileLocked(localFolder, dto.getFile());
 					logger.info("Serving action: " + dto.toString());
 					if (S3Action.CREATE.equals(dto.getS3Action()) || S3Action.MODIFY.equals(dto.getS3Action())) {
-						List<String> folders = uploadService.getOrUpdate(localFolder + dto.getFile(), dto.getRemoteFolder() + dto.getFile(), dto.getTime());
-						for(String folder : folders) {
-							//start as separate thread to prevent lock (the thread is probably waiting for watchService.poll operation
-							new Thread(new AddNewWatchKey(localFolder, folder)).start();							
+						List<String> folders = uploadService.getOrUpdate(localFolder + dto.getFile(),
+								dto.getRemoteFolder() + dto.getFile(), dto.getTime());
+						if (folders.size() > 0) {
+							for (String folder : folders) {
+								// if a new folder will be created, current watchers will throw an event on the
+								// parent folder of this event
+								if (((WatchListener) WatchListeners.getThread(localFolder).getR())
+										.existsWatchKey(folder)) {
+									String subpath = dto.getFile().replace(folder, "");
+									String subfolder = subpath.substring(0, subpath.indexOf('/', 1));
+									WatchListeners.putChangesWhileLocked(localFolder, folder + subfolder);
+								}
+								// start as separate thread to prevent lock (the thread is probably waiting for
+								// watchService.poll operation
+								new Thread(new AddNewWatchKey(localFolder, folder)).start();
+							}
 						}
+						//FIXME: event on file triggers twice
+						WatchListeners.putChangesWhileLocked(localFolder, dto.getFile());
+						WatchListeners.putChangesWhileLocked(localFolder, dto.getFile());
+
 					} else if (S3Action.DELETE.equals(dto.getS3Action())) {
 						long localFileLastModified = Path.of(localFolder + dto.getFile()).toFile().lastModified();
 						if (localFileLastModified <= dto.getTime()) {
 							List<String> toDelete = FileUtils.toDeleteFileAndEmptyTree(localFolder + dto.getFile());
-							for(String s : toDelete) {
-								//start as separate thread to prevent lock (the thread is probably waiting for watchService.poll operation
+							for (String s : toDelete) {
+								// start as separate thread to prevent lock (the thread is probably waiting for
+								// watchService.poll operation
 								new Thread(new RemoveWatchKey(localFolder, s)).start();
 							}
 						} else {
-							logger.info("Local file is newer than the remote one: {} -> {}", localFileLastModified, dto.getTime());
+							logger.info("Local file is newer than the remote one: {} -> {}", localFileLastModified,
+									dto.getTime());
 						}
 					}
-				}				
+				}
 			} else {
 				logger.info("Consuming AMQP message made by this client -> discarded");
 			}
@@ -69,25 +91,25 @@ public class AmqpSyncListener {
 			WatchListeners.releaseSemaphore();
 		}
 	}
-	
+
 	public class AddNewWatchKey implements Runnable {
 
 		private String folder;
 		private String localRootFolder;
-		
+
 		public AddNewWatchKey(String localRootFolder, String folder) {
 			this.folder = folder;
 			this.localRootFolder = localRootFolder;
 		}
-		
+
 		@Override
 		public void run() {
-			((WatchListener)WatchListeners.getThread(localRootFolder).getR()).addFolder(folder);
+			((WatchListener) WatchListeners.getThread(localRootFolder).getR()).addFolder(folder);
 		}
 	}
-	
+
 	public class RemoveWatchKey implements Runnable {
-		
+
 		private String folder;
 		private String localRootFolder;
 
@@ -95,11 +117,11 @@ public class AmqpSyncListener {
 			this.folder = folder;
 			this.localRootFolder = localRootFolder;
 		}
-		
+
 		@Override
 		public void run() {
-			((WatchListener)WatchListeners.getThread(localRootFolder).getR()).removeFolder(folder);
-		}		
+			((WatchListener) WatchListeners.getThread(localRootFolder).getR()).removeFolder(folder);
+		}
 	}
 
 }

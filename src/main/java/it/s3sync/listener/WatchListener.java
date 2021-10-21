@@ -14,6 +14,7 @@ import java.nio.file.WatchService;
 import java.nio.file.Watchable;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -76,27 +77,31 @@ public class WatchListener implements Runnable {
 				}
 			});
 			while (true) {
+				// Timeout needed because sometimes maps must be reloaded
+				WatchKey watchKey = watchService.poll(60, TimeUnit.SECONDS);
 				// Operation locked by batch processes (like startup synchonization, batch
 				// synchronization, etc)
-				if (WatchListeners.threadNotLocked()) {
-					// Timeout needed because sometimes maps must be reloaded
-					WatchKey watchKey = watchService.poll(60, TimeUnit.SECONDS);
-					if (watchKey != null) {
-						for (WatchEvent<?> event : watchKey.pollEvents()) {
-							logger.debug("[[DEBUG]] Managing event {}", event.toString());
-							try {
-								managingEvent(event, watchKey.watchable());
-							} catch (Exception e) {
-								logger.error("[[ERROR]] Exception managing event {}/{}, proceed with next",
-										event.kind(), watchKey.watchable().toString());
+				boolean solved = false;
+				do {
+					if (WatchListeners.threadNotLocked()) {
+						if (watchKey != null) {
+							for (WatchEvent<?> event : watchKey.pollEvents()) {
+								logger.debug("[[DEBUG]] Managing event {}", event.toString());
+								try {
+									managingEvent(event, watchKey.watchable());
+								} catch (Exception e) {
+									logger.error("[[ERROR]] Exception managing event {}/{}, proceed with next",
+											event.kind(), watchKey.watchable().toString());
+								}
 							}
 							watchKey.reset();
 						}
-					}
-				} else {
-					logger.debug("[[DEBUG]] Thread on {} currently locked by semaphore, wait 1000ms", localRootFolder);
-					Thread.sleep(1000);
-				}
+						solved = true;
+					} else {
+						logger.debug("[[DEBUG]] Thread on {} currently locked by semaphore, wait 1000ms", localRootFolder);
+						Thread.sleep(1000);
+					}					
+				} while(!solved);
 			}
 		} catch (Exception e) {
 			throw new RuntimeException("[[ERROR]]Cannot start listening thread", e);
@@ -120,19 +125,17 @@ public class WatchListener implements Runnable {
 			case "ENTRY_MODIFY":
 				logger.debug("[[DEBUG]] Managing event CREATED on file {}", fullLocation);
 				if (fullPath.toFile().isDirectory()) {
-					List<Path> filesToUpload = new ArrayList<>();
 					logger.debug("[[DEBUG]] CREATE event on folder {}", fullLocation);
 					try {
 						Files.walkFileTree(fullPath, new SimpleFileVisitor<Path>() {
 							@Override
-							public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+							public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
+									throws IOException {
 								logger.debug("[[DEBUG]] Add watchKey on {}", fullLocation);
-								watchKeys.put(dir.toString(),
-										dir.register(watchService,
-												new WatchEvent.Kind[] { StandardWatchEventKinds.ENTRY_CREATE,
-														StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_MODIFY,
-														StandardWatchEventKinds.OVERFLOW },
-												SensitivityWatchEventModifier.MEDIUM));
+								watchKeys.put(dir.toString(), dir.register(watchService, new WatchEvent.Kind[] {
+										StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_DELETE,
+										StandardWatchEventKinds.ENTRY_MODIFY, StandardWatchEventKinds.OVERFLOW },
+										SensitivityWatchEventModifier.MEDIUM));
 								logger.debug("[[DEBUG]] Add {} to folder tree", fullLocation);
 								directories.add(dir.toString());
 								return FileVisitResult.CONTINUE;
@@ -216,6 +219,10 @@ public class WatchListener implements Runnable {
 		} catch (Exception e) {
 			logger.error("[[ERROR]] Exception deleting folder {}", fullLocation, e);
 		}
+	}
+
+	public boolean existsWatchKey(String folder) {
+		return watchKeys.get(folder) != null;
 	}
 
 }

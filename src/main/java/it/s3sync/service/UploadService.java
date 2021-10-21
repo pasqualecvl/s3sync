@@ -74,6 +74,12 @@ public class UploadService {
 	private static final Logger logger = LoggerFactory.getLogger(UploadService.class);
 
 	public void upload(Path path, String relativePath, String remoteFolder, Item item, Long lastModified) {
+		//FIXME: for a strange reason, in some cases, folder is uploaded.
+		//Rework this if with a real fix
+		if(path.toFile().isDirectory()) {
+			return;
+		}
+		
 		logger.debug("Uploading {} to s3 folder {} with relative path {}", path, remoteFolder, relativePath);
 		try {
 			PutObjectRequest objectRequest = PutObjectRequest.builder()

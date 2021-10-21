@@ -51,15 +51,17 @@ public class FileUtils {
 		List<String> deleteFolders = new ArrayList<>();
 		Path leafPath = Paths.get(fullPath);
 		try {
-			Files.delete(leafPath);
-			do {
-				if (leafPath.getParent().toFile().listFiles().length == 0) {
-					deleteFolders.add(leafPath.getParent().toString());
-					leafPath = leafPath.getParent();
-				} else {
-					break;
-				}
-			} while (!leafPath.getParent().toString().equals("/"));
+			if(Files.exists(leafPath)) {
+				Files.delete(leafPath);
+				do {
+					if (leafPath.getParent().toFile().listFiles().length == 0) {
+						deleteFolders.add(leafPath.getParent().toString());
+						leafPath = leafPath.getParent();
+					} else {
+						break;
+					}
+				} while (!leafPath.getParent().toString().equals("/"));
+			}
 		} catch (IOException e) {
 			logger.error("Exception", e);
 		}
