@@ -6,6 +6,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -43,6 +44,7 @@ import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectResponse;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 
@@ -118,18 +120,20 @@ public class UploadService {
 	}
 
 	public List<String> getOrUpdate(String localFullPathFolder, String remoteFullPathFolder, long lastModified) {
-		logger.info("[[INFO]] Fetch or update file {} from remote folder {}", localFullPathFolder,
-				remoteFullPathFolder);
-		GetObjectRequest request = GetObjectRequest.builder().bucket(GlobalPropertiesManager.getProperty("s3.bucket"))
-				.key(remoteFullPathFolder).build();
-		ResponseInputStream<GetObjectResponse> response = s3Client.getObject(request);
 		try {
-			logger.debug("[[DEBUG]] Creating folder tree for file {}", localFullPathFolder);
+			logger.info("[[INFO]] Fetch or update file {} from remote folder {}", localFullPathFolder,
+					remoteFullPathFolder);
+			GetObjectRequest request = GetObjectRequest.builder().bucket(GlobalPropertiesManager.getProperty("s3.bucket"))
+					.key(remoteFullPathFolder).build();
+			ResponseInputStream<GetObjectResponse> response = s3Client.getObject(request);
+				logger.debug("[[DEBUG]] Creating folder tree for file {}", localFullPathFolder);
 			return FileUtils.createFileTree(localFullPathFolder, response.readAllBytes(), lastModified);
 		} catch (IOException e) {
-			logger.error("Exception", e);
-			throw new RuntimeException(e);
+			logger.error("Exception creating file tree. File {} not synchronized", localFullPathFolder, e);
+		} catch(NoSuchKeyException e) {
+			logger.error("Exception reading file {} from s3 to {}", remoteFullPathFolder, localFullPathFolder, e);			
 		}
+		return new ArrayList<>();
 	}
 
 	public boolean deleteTrashed(String relativePath) {
@@ -240,7 +244,7 @@ public class UploadService {
 			} else {
 				// subfolder -> filter filename by regexp
 				List<Item> toDelete = mongoOperations.find(new Query(Criteria.where("ownedByFolder").is(remoteFolder)
-						.and("originalName").regex("/^" + relativeLocation + "/")), Item.class);
+						.and("deleted").is(false).and("originalName").regex("^" + relativeLocation)), Item.class);
 				logger.debug("[[DEBUG]] Found {}# files to delete filtering by regexp {} on remote folder {}",
 						toDelete.size(), "/^" + relativeLocation + "/", remoteFolder);
 				toDelete.forEach(item -> {
@@ -255,7 +259,7 @@ public class UploadService {
 	public void uploadAsFolder(Path fullPath, String localRootFolder, String remoteFolder) {
 		String relativePath = fullPath.toString().replaceFirst(localRootFolder, "");
 		List<Item> toMatch = mongoOperations.find(new Query(
-				Criteria.where("ownedByFolder").is(remoteFolder).and("originalName").regex("/^" + relativePath + "/")),
+				Criteria.where("ownedByFolder").is(remoteFolder).and("originalName").regex("^" + relativePath)),
 				Item.class);
 		Map<String, Item> toMatchMap = toMatch.stream().collect(Collectors.toMap(Item::getOriginalName, Item::get));
 
@@ -268,13 +272,16 @@ public class UploadService {
 					if (file.isFile() && file.canRead()
 							&& FileUtils.notMatchFilters(synchronizationService.getExclusionPattern(localRootFolder),
 									path.toString().replaceFirst(localRootFolder, ""))) {
-						if (toMatchMap.containsKey(relativePath)) {
+						if (toMatchMap.containsKey(path.toString())) {
 							if (toMatchMap.get(relativePath).getLastUpdate() > lastModified) {
+								logger.debug("[[DEBUG]] File {} in synchronizing folder is out to date. Updating...", path.toString());
 								getOrUpdate(path.toString(), relativePath, lastModified);
 							} else {
-								upload(path, remoteFolder, relativePath, lastModified);
+								logger.debug("[[DEBUG]] File {} in synchronizing must be uploaded", path.toString());
+								upload(path, remoteFolder, relativePath, toMatchMap.get(relativePath), lastModified);
 							}
 						} else {
+							logger.debug("[[DEBUG]] File {} in synchronizing folder not present in remote one, Uploading...", path.toString());
 							upload(path, remoteFolder, relativePath, lastModified);
 						}
 					}
