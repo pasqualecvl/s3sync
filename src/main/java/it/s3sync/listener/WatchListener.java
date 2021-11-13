@@ -90,7 +90,7 @@ public class WatchListener implements Runnable {
 								try {
 									managingEvent(event, watchKey.watchable());
 								} catch (Exception e) {
-									logger.error("[[ERROR]] Exception managing event {}/{}, proceed with next",
+									logger.error("[[ERROR]] Exception managing event {} on {}, proceed with next",
 											event.kind(), watchKey.watchable().toString(), e);
 								}
 							}
@@ -100,7 +100,7 @@ public class WatchListener implements Runnable {
 					} else {
 						logger.debug("[[DEBUG]] Thread on {} currently locked by semaphore, wait 1000ms", localRootFolder);
 						Thread.sleep(1000);
-					}					
+					}
 				} while(!solved);
 			}
 		} catch (Exception e) {
