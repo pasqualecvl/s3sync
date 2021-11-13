@@ -254,9 +254,9 @@ public class UploadService {
 			} else {
 				// subfolder -> filter filename by regexp
 				List<Item> toDelete = mongoOperations.find(new Query(Criteria.where("ownedByFolder").is(remoteFolder)
-						.and("deleted").is(false).and("originalName").regex("^" + relativeLocation)), Item.class);
+						.and("deleted").is(false).and("originalName").regex("^" + relativeLocation + "/")), Item.class);
 				logger.debug("[[DEBUG]] Found {}# files to delete filtering by regexp {} on remote folder {}",
-						toDelete.size(), "/^" + relativeLocation + "/", remoteFolder);
+						toDelete.size(), relativeLocation + "/", remoteFolder);
 				toDelete.forEach(item -> {
 					if (!delete(item.getOwnedByFolder(), item.getOriginalName())) {
 						logger.error("[[ERROR]] Error deleting S3 file {}", item.getOriginalName());
