@@ -91,7 +91,7 @@ public class WatchListener implements Runnable {
 									managingEvent(event, watchKey.watchable());
 								} catch (Exception e) {
 									logger.error("[[ERROR]] Exception managing event {}/{}, proceed with next",
-											event.kind(), watchKey.watchable().toString());
+											event.kind(), watchKey.watchable().toString(), e);
 								}
 							}
 							watchKey.reset();

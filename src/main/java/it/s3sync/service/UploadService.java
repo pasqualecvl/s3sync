@@ -26,6 +26,7 @@ import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.json.JsonMapper;
 
+import it.s3sync.exception.PreventUploadForFolderException;
 import it.s3sync.listener.SynchronizationMessageDto;
 import it.s3sync.listener.SynchronizationMessageDto.S3Action;
 import it.s3sync.model.AttachedClient;
@@ -77,7 +78,10 @@ public class UploadService {
 		//FIXME: for a strange reason, in some cases, folder is uploaded.
 		//Rework this if with a real fix
 		if(path.toFile().isDirectory()) {
-			return;
+			throw new PreventUploadForFolderException();
+		}
+		if(lastModified == null || lastModified == 0) {
+			throw new RuntimeException("lastModified MUST be valorised");
 		}
 		
 		logger.debug("Uploading {} to s3 folder {} with relative path {}", path, remoteFolder, relativePath);
@@ -284,7 +288,11 @@ public class UploadService {
 								getOrUpdate(path.toString(), relativePath, lastModified);
 							} else {
 								logger.debug("[[DEBUG]] File {} in synchronizing must be uploaded", path.toString());
-								upload(path, remoteFolder, relativePath, toMatchMap.get(relativePath), lastModified);
+								try {
+									upload(path, remoteFolder, relativePath, toMatchMap.get(relativePath), lastModified);
+								} catch(PreventUploadForFolderException e) {
+									logger.error("[[ERROR]] Trying to upload folder {}, prevented by default", path.toString());
+								}
 							}
 						} else {
 							logger.debug("[[DEBUG]] File {} in synchronizing folder not present in remote one, Uploading...", path.toString());

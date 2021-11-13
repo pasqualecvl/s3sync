@@ -25,6 +25,7 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 
+import it.s3sync.exception.PreventUploadForFolderException;
 import it.s3sync.listener.WatchListeners;
 import it.s3sync.model.AttachedClient;
 import it.s3sync.model.AttachedClient.SyncFolder;
@@ -121,6 +122,8 @@ public class SynchronizationService {
 							Files.getLastModifiedTime(path).toMillis());
 					} catch (IOException e) {
 						logger.error("[[ERROR]] Cannot upload file {}", path.toString(), e);
+					} catch (PreventUploadForFolderException e) {
+						logger.error("[[ERROR]] Trying to upload folder {}, prevented by default", path.toString());
 					}
 				} else {
 					logger.debug("[[DEBUG]] {} will not be uploaded because it is oldest than the remote one",path.toString());
