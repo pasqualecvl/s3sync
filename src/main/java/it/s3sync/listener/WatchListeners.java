@@ -74,36 +74,36 @@ public class WatchListeners {
 		return WatchListeners.threadSemaphore == 0;
 	}
 
-	public static void putChangesWhileLocked(String syncFolder, Operation operation) {
+	public static void putChangesWhileLocked(String folder, Operation operation) {
 		synchronized (changesWhileLocked) {
 			logger.debug("[[DEBUG]] Changing {} on file {} was made on folder {} programmatically by listener", 
-					operation.getS3Action(), operation.getOnFile(), syncFolder);
-			if (changesWhileLocked.containsKey(syncFolder)) {
-				Collection<Operation> fileForFolder = changesWhileLocked.get(syncFolder);
+					operation.getS3Action(), operation.getOnFile(), folder);
+			if (changesWhileLocked.containsKey(folder)) {
+				Collection<Operation> fileForFolder = changesWhileLocked.get(folder);
 				if (fileForFolder == null) {
 					fileForFolder = Collections.synchronizedCollection(new ArrayList<>());
 				}
 				fileForFolder.add(operation);
-				changesWhileLocked.put(syncFolder, fileForFolder);
+				changesWhileLocked.put(folder, fileForFolder);
 			} else {
 				Collection<Operation> fileForFolder = Collections.synchronizedCollection(new ArrayList<>());
 				fileForFolder.add(operation);
-				changesWhileLocked.put(syncFolder, fileForFolder);
+				changesWhileLocked.put(folder, fileForFolder);
 			}
 		}
 	}
 
-	public static boolean checkForProgrammaticallyChange(String syncFolder, Operation operation) {
-		if (changesWhileLocked.containsKey(syncFolder) && changesWhileLocked.get(syncFolder) != null
-				&& changesWhileLocked.get(syncFolder).contains(operation)) {
+	public static boolean checkForProgrammaticallyChange(String folder, Operation operation) {
+		if (changesWhileLocked.containsKey(folder) && changesWhileLocked.get(folder) != null
+				&& changesWhileLocked.get(folder).contains(operation)) {
 			logger.debug("[[DEBUG]] Event {} on file {}/{} suppressed because it was modified by S3Sync.",
-					operation.getS3Action(), syncFolder, operation.getOnFile());
+					operation.getS3Action(), folder, operation.getOnFile());
 			synchronized (changesWhileLocked) {
-				changesWhileLocked.get(syncFolder).remove(operation);
+				changesWhileLocked.get(folder).remove(operation);
 			}
 			return true;
 		} else {
-			logger.debug("[[DEBUG]] Event {} on file {}/{} must be served.", operation.getS3Action(), syncFolder, operation.getOnFile());
+			logger.debug("[[DEBUG]] Event {} on file {}/{} must be served.", operation.getS3Action(), folder, operation.getOnFile());
 			return false;
 		}
 	}

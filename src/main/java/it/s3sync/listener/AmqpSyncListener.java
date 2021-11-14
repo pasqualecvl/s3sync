@@ -61,16 +61,15 @@ public class AmqpSyncListener {
 									new Thread(new AddNewWatchKey(localFolder, folder)).start();
 								}
 								Operation operation = new Operation();
-								operation.setOnFile(folder.replaceFirst(localFolder, ""));
+								operation.setOnFile(folder);
 								operation.setS3Action(dto.getS3Action());
-								WatchListeners.putChangesWhileLocked(localFolder, operation);
+								WatchListeners.putChangesWhileLocked(folder, operation);
 							}
-						}
-						//FIXME: event on file triggers twice
+						}						
 						Operation operation = new Operation();
-						operation.setOnFile(dto.getFile());
+						operation.setOnFile(localFolder + dto.getFile());
 						operation.setS3Action(dto.getS3Action());
-						WatchListeners.putChangesWhileLocked(localFolder, operation);
+						WatchListeners.putChangesWhileLocked((localFolder + dto.getFile()).substring(0, (localFolder + dto.getFile()).lastIndexOf('/')), operation);
 					} else if (S3Action.DELETE.equals(dto.getS3Action())) {
 						long localFileLastModified = Path.of(localFolder + dto.getFile()).toFile().lastModified();
 						if (localFileLastModified <= dto.getTime()) {

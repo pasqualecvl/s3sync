@@ -96,6 +96,7 @@ public class WatchListener implements Runnable {
 											event.kind(), watchKey.watchable().toString(), e);
 								}
 							}
+							WatchListeners.cleanChangesWhileLocked(watchKey.watchable().toString());
 							watchKey.reset();
 						}
 						solved = true;
@@ -152,8 +153,8 @@ public class WatchListener implements Runnable {
 				WatchEvent<?> lastEvent = filteredEvents.get(filteredEvents.size());
 				filteredEvents.remove(filteredEvents.size());
 				filteredEvents.add(foundPosition, lastEvent);
-				filteredEvents.add(event);
 			}
+			filteredEvents.add(event);
 		}
 		return filteredEvents;
 	}
@@ -162,17 +163,28 @@ public class WatchListener implements Runnable {
 		String listenerPath = watchable.toString();
 		String resourceName = event.context().toString();
 		String fullLocation = listenerPath + "/" + resourceName;
+		Path fullPath = Path.of(fullLocation);
+
+		boolean workAsDirectoryEvent = false;
 		Operation operation = new Operation();
-		operation.setS3Action("ENTRY_CREATE".equals(event.kind().name()) ? 
-				S3Action.CREATE : "ENTRY_MODIFY".equals(event.kind().name()) ? 
-						S3Action.MODIFY : S3Action.DELETE);
-		operation.setOnFile(fullLocation.replaceFirst(localRootFolder, ""));
-		if (WatchListeners.checkForProgrammaticallyChange(localRootFolder, operation)) {
+		if(Files.isDirectory(fullPath)) {
+			workAsDirectoryEvent = true;
+			operation.setS3Action("ENTRY_CREATE".equals(event.kind().name()) ? 
+					S3Action.CREATE : "ENTRY_MODIFY".equals(event.kind().name()) ? 
+							S3Action.MODIFY : S3Action.DELETE);
+			operation.setOnFile(fullLocation);
+		} else {
+			operation.setS3Action("ENTRY_CREATE".equals(event.kind().name()) ? 
+					S3Action.CREATE : "ENTRY_MODIFY".equals(event.kind().name()) ? 
+							S3Action.MODIFY : S3Action.DELETE);
+			operation.setOnFile(fullLocation.replaceFirst(localRootFolder, ""));			
+		}
+		String rootKey = workAsDirectoryEvent ? fullLocation : fullLocation.substring(0, fullLocation.lastIndexOf('/'));
+		if (WatchListeners.checkForProgrammaticallyChange(rootKey, operation)) {
 			logger.info("[[INFO]] Event on {} for file {} was made by s3sync. Skipped.", localRootFolder, fullLocation);
 
 			return;
 		}
-		Path fullPath = Path.of(fullLocation);
 		if (FileUtils.notMatchFilters(synchronizationService.getExclusionPattern(localRootFolder), fullLocation)) {
 			switch (event.kind().name()) {
 			case "ENTRY_CREATE":
