@@ -114,10 +114,10 @@ public class WatchListener implements Runnable {
 		List<WatchEvent<?>> filteredEvents = new ArrayList<>();
 		List<Integer> blockList = new ArrayList<>();
 		for(int i = 0; i< deduplicateEvent.size(); i++) {
-			if(deduplicateEvent.get(i).kind().name().equals("EVENT_CREATE") || deduplicateEvent.get(i).kind().name().equals("EVENT_CREATE")) {
+			if(deduplicateEvent.get(i).kind().name().equals("ENTRY_CREATE") || deduplicateEvent.get(i).kind().name().equals("ENTRY_CREATE")) {
 				int foundPosition = -1;
 				for(int j = i + 1; j < deduplicateEvent.size(); j++) {
-					if(deduplicateEvent.get(j).kind().name().equals("EVENT_DELETE") && 
+					if(deduplicateEvent.get(j).kind().name().equals("ENTRY_DELETE") && 
 							(((Path)deduplicateEvent.get(j).context()).equals((Path)deduplicateEvent.get(j).context()))
 									&& !blockList.contains(j)) {
 						foundPosition = j;
@@ -152,8 +152,8 @@ public class WatchListener implements Runnable {
 				WatchEvent<?> lastEvent = filteredEvents.get(filteredEvents.size());
 				filteredEvents.remove(filteredEvents.size());
 				filteredEvents.add(foundPosition, lastEvent);
-				filteredEvents.add(event);
-			}
+			} 
+			filteredEvents.add(event);
 		}
 		return filteredEvents;
 	}
@@ -245,6 +245,7 @@ public class WatchListener implements Runnable {
 	}
 
 	public void addFolder(String fullLocation) {
+		logger.debug("[[DEBUG]] Add local folder {} to listeners");
 		Path path = Path.of(fullLocation);
 		synchronized (watchKeys) {
 			if (!watchKeys.containsKey(fullLocation)) {
@@ -258,6 +259,7 @@ public class WatchListener implements Runnable {
 				} catch (IOException e) {
 					throw new RuntimeException(e);
 				}
+				logger.debug("[[DEBUG]] Add local folder {} to directories list");
 				directories.add(fullLocation);
 			}
 		}
