@@ -14,7 +14,6 @@ import java.nio.file.WatchService;
 import java.nio.file.Watchable;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -24,9 +23,12 @@ import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.messaging.simp.user.DefaultUserDestinationResolver;
 
 import com.sun.nio.file.SensitivityWatchEventModifier;
 
+import it.s3sync.listener.SynchronizationMessageDto.S3Action;
+import it.s3sync.listener.WatchListeners.Operation;
 import it.s3sync.service.SynchronizationService;
 import it.s3sync.service.UploadService;
 import it.s3sync.utils.FileUtils;
@@ -85,7 +87,7 @@ public class WatchListener implements Runnable {
 				do {
 					if (WatchListeners.threadNotLocked()) {
 						if (watchKey != null) {
-							for (WatchEvent<?> event : watchKey.pollEvents()) {
+							for (WatchEvent<?> event : deleteOverCreation(deduplicateEvent(watchKey.pollEvents()))) {
 								logger.debug("[[DEBUG]] Managing event {}", event.toString());
 								try {
 									managingEvent(event, watchKey.watchable());
@@ -108,12 +110,64 @@ public class WatchListener implements Runnable {
 		}
 	}
 
+	private List<WatchEvent<?>> deleteOverCreation(List<WatchEvent<?>> deduplicateEvent) {
+		List<WatchEvent<?>> filteredEvents = new ArrayList<>();
+		List<Integer> blockList = new ArrayList<>();
+		for(int i = 0; i< deduplicateEvent.size(); i++) {
+			if(deduplicateEvent.get(i).kind().name().equals("EVENT_CREATE") || deduplicateEvent.get(i).kind().name().equals("EVENT_CREATE")) {
+				int foundPosition = -1;
+				for(int j = i + 1; j < deduplicateEvent.size(); j++) {
+					if(deduplicateEvent.get(j).kind().name().equals("EVENT_DELETE") && 
+							(((Path)deduplicateEvent.get(j).context()).equals((Path)deduplicateEvent.get(j).context()))
+									&& !blockList.contains(j)) {
+						foundPosition = j;
+						blockList.add(j);
+						break;
+					}
+				}
+				if(foundPosition == -1) {
+					filteredEvents.add(deduplicateEvent.get(i));
+				}
+			} else if(!blockList.contains(i)) {
+				filteredEvents.add(deduplicateEvent.get(i));
+			}
+		}
+		return filteredEvents;
+	}
+
+	private List<WatchEvent<?>> deduplicateEvent(List<WatchEvent<?>> pollEvents) {
+		List<WatchEvent<?>> filteredEvents = new ArrayList<>();
+		for(WatchEvent<?> event : pollEvents) {
+			int foundPosition = -1;
+			for(int i = 0; i < filteredEvents.size(); i++) {
+				if(filteredEvents.get(i).kind().name().equals(event.kind().name())
+						&& ((Path)filteredEvents.get(i).context()).equals((Path)event.context())) {
+					//alredy present, discard the old one
+					foundPosition = i;
+					break;
+				}
+ 			}
+			
+			if(foundPosition > -1) {
+				WatchEvent<?> lastEvent = filteredEvents.get(filteredEvents.size());
+				filteredEvents.remove(filteredEvents.size());
+				filteredEvents.add(foundPosition, lastEvent);
+				filteredEvents.add(event);
+			}
+		}
+		return filteredEvents;
+	}
+
 	private void managingEvent(WatchEvent<?> event, Watchable watchable) {
 		String listenerPath = watchable.toString();
 		String resourceName = event.context().toString();
 		String fullLocation = listenerPath + "/" + resourceName;
-		if (WatchListeners.checkForProgrammaticallyChange(localRootFolder,
-				fullLocation.replaceFirst(localRootFolder, ""))) {
+		Operation operation = new Operation();
+		operation.setS3Action("ENTRY_CREATE".equals(event.kind().name()) ? 
+				S3Action.CREATE : "ENTRY_MODIFY".equals(event.kind().name()) ? 
+						S3Action.MODIFY : S3Action.DELETE);
+		operation.setOnFile(fullLocation.replaceFirst(localRootFolder, ""));
+		if (WatchListeners.checkForProgrammaticallyChange(localRootFolder, operation)) {
 			logger.info("[[INFO]] Event on {} for file {} was made by s3sync. Skipped.", localRootFolder, fullLocation);
 
 			return;

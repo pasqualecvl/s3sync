@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 
 import it.s3sync.listener.SynchronizationMessageDto.S3Action;
+import it.s3sync.listener.WatchListeners.Operation;
 import it.s3sync.service.SynchronizationService;
 import it.s3sync.service.UploadService;
 import it.s3sync.utils.FileUtils;
@@ -53,21 +54,23 @@ public class AmqpSyncListener {
 							for (String folder : folders) {
 								// if a new folder will be created, current watchers will throw an event on the
 								// parent folder of this event
-								if (((WatchListener) WatchListeners.getThread(localFolder).getR())
+								if (!((WatchListener) WatchListeners.getThread(localFolder).getR())
 										.existsWatchKey(folder)) {
-									String subpath = dto.getFile().replace(folder, "");
-									String subfolder = subpath.substring(0, subpath.indexOf('/', 1));
-									WatchListeners.putChangesWhileLocked(localFolder, folder + subfolder);
+									// start as separate thread to prevent lock (the thread is probably waiting for
+									// watchService.poll operation
+									new Thread(new AddNewWatchKey(localFolder, folder)).start();
 								}
-								// start as separate thread to prevent lock (the thread is probably waiting for
-								// watchService.poll operation
-								new Thread(new AddNewWatchKey(localFolder, folder)).start();
+								Operation operation = new Operation();
+								operation.setOnFile(folder.replaceFirst(localFolder, ""));
+								operation.setS3Action(dto.getS3Action());
+								WatchListeners.putChangesWhileLocked(localFolder, operation);
 							}
 						}
 						//FIXME: event on file triggers twice
-						WatchListeners.putChangesWhileLocked(localFolder, dto.getFile());
-						WatchListeners.putChangesWhileLocked(localFolder, dto.getFile());
-
+						Operation operation = new Operation();
+						operation.setOnFile(dto.getFile());
+						operation.setS3Action(dto.getS3Action());
+						WatchListeners.putChangesWhileLocked(localFolder, operation);
 					} else if (S3Action.DELETE.equals(dto.getS3Action())) {
 						long localFileLastModified = Path.of(localFolder + dto.getFile()).toFile().lastModified();
 						if (localFileLastModified <= dto.getTime()) {

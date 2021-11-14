@@ -6,10 +6,12 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import it.s3sync.listener.SynchronizationMessageDto.S3Action;
 import it.s3sync.service.SynchronizationService;
 import it.s3sync.service.UploadService;
 
@@ -17,7 +19,7 @@ public class WatchListeners {
 
 	private static Map<String, ThreadAndRunnable> threadPool = new HashMap<>();
 
-	private static volatile Map<String, Collection<String>> changesWhileLocked = new HashMap<>();
+	private static volatile Map<String, Collection<Operation>> changesWhileLocked = new HashMap<>();
 
 	private static volatile int threadSemaphore = 0;
 
@@ -72,36 +74,36 @@ public class WatchListeners {
 		return WatchListeners.threadSemaphore == 0;
 	}
 
-	public static void putChangesWhileLocked(String syncFolder, String file) {
+	public static void putChangesWhileLocked(String syncFolder, Operation operation) {
 		synchronized (changesWhileLocked) {
-			logger.debug("[[DEBUG]] Changing on file {} was made on folder {} programmatically by listener", 
-					file, syncFolder);
+			logger.debug("[[DEBUG]] Changing {} on file {} was made on folder {} programmatically by listener", 
+					operation.getS3Action(), operation.getOnFile(), syncFolder);
 			if (changesWhileLocked.containsKey(syncFolder)) {
-				Collection<String> fileForFolder = changesWhileLocked.get(syncFolder);
+				Collection<Operation> fileForFolder = changesWhileLocked.get(syncFolder);
 				if (fileForFolder == null) {
 					fileForFolder = Collections.synchronizedCollection(new ArrayList<>());
 				}
-				fileForFolder.add(file);
+				fileForFolder.add(operation);
 				changesWhileLocked.put(syncFolder, fileForFolder);
 			} else {
-				Collection<String> fileForFolder = Collections.synchronizedCollection(new ArrayList<>());
-				fileForFolder.add(file);
+				Collection<Operation> fileForFolder = Collections.synchronizedCollection(new ArrayList<>());
+				fileForFolder.add(operation);
 				changesWhileLocked.put(syncFolder, fileForFolder);
 			}
 		}
 	}
 
-	public static boolean checkForProgrammaticallyChange(String syncFolder, String file) {
+	public static boolean checkForProgrammaticallyChange(String syncFolder, Operation operation) {
 		if (changesWhileLocked.containsKey(syncFolder) && changesWhileLocked.get(syncFolder) != null
-				&& changesWhileLocked.get(syncFolder).contains(file)) {
-			logger.debug("[[DEBUG]] Event on file {}/{} suppressed because it was modified by S3Sync.",
-					syncFolder, file);
+				&& changesWhileLocked.get(syncFolder).contains(operation)) {
+			logger.debug("[[DEBUG]] Event {} on file {}/{} suppressed because it was modified by S3Sync.",
+					operation.getS3Action(), syncFolder, operation.getOnFile());
 			synchronized (changesWhileLocked) {
-				changesWhileLocked.get(syncFolder).remove(file);
+				changesWhileLocked.get(syncFolder).remove(operation);
 			}
 			return true;
 		} else {
-			logger.debug("[[DEBUG]] Event on file {}/{} must be served.", syncFolder, file);
+			logger.debug("[[DEBUG]] Event {} on file {}/{} must be served.", operation.getS3Action(), syncFolder, operation.getOnFile());
 			return false;
 		}
 	}
@@ -137,5 +139,45 @@ public class WatchListeners {
 		public void setR(Runnable r) {
 			this.r = r;
 		}
+	}
+	
+	public static class Operation {
+		private String onFile;
+		private S3Action s3Action;
+		
+		public String getOnFile() {
+			return onFile;
+		}
+		
+		public void setOnFile(String onFile) {
+			this.onFile = onFile;
+		}
+		
+		public S3Action getS3Action() {
+			return s3Action;
+		}
+		
+		public void setS3Action(S3Action s3Action) {
+			this.s3Action = s3Action;
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(onFile, s3Action);
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj)
+				return true;
+			if (obj == null)
+				return false;
+			if (getClass() != obj.getClass())
+				return false;
+			Operation other = (Operation) obj;
+			return onFile.equals(other.onFile) && s3Action == other.s3Action;
+		}
+		
+		
 	}
 }
