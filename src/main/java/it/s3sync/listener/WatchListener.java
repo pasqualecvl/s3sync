@@ -23,7 +23,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.messaging.simp.user.DefaultUserDestinationResolver;
 
 import com.sun.nio.file.SensitivityWatchEventModifier;
 
@@ -87,7 +86,7 @@ public class WatchListener implements Runnable {
 				do {
 					if (WatchListeners.threadNotLocked()) {
 						if (watchKey != null) {
-							for (WatchEvent<?> event : deleteOverCreation(deduplicateEvent(watchKey.pollEvents()))) {
+							for (WatchEvent<?> event : sanitize(watchKey.pollEvents(), watchKey)) {
 								logger.debug("[[DEBUG]] Managing event {}", event.toString());
 								try {
 									managingEvent(event, watchKey.watchable());
@@ -111,15 +110,32 @@ public class WatchListener implements Runnable {
 		}
 	}
 
-	private List<WatchEvent<?>> deleteOverCreation(List<WatchEvent<?>> deduplicateEvent) {
+	List<WatchEvent<?>> sanitize(List<WatchEvent<?>> events, WatchKey watchKey) {
+		return skipCreateOnFolder(removeDeleteOverCreation(deduplicateEvent(events)), watchKey);
+	}
+	
+	private List<WatchEvent<?>> skipCreateOnFolder(List<WatchEvent<?>> events, WatchKey watchKey) {
+		List<WatchEvent<?>> filteredEvents = new ArrayList<>();
+		for(int i = 0; i< events.size(); i++) {
+			if(events.get(i).kind().name().equals("EVENT_CREATE") && 
+					Files.isDirectory(Path.of(watchKey.watchable().toString() + events.get(i).context().toString()))) {
+				logger.trace("[[TRACE]] Discarding event on {} because it is a CRAETE on a folder (must do nothing)");
+			} else {
+				filteredEvents.add(events.get(i));
+			}
+		}
+		return filteredEvents;
+	}
+	
+	private List<WatchEvent<?>> removeDeleteOverCreation(List<WatchEvent<?>> events) {
 		List<WatchEvent<?>> filteredEvents = new ArrayList<>();
 		List<Integer> blockList = new ArrayList<>();
-		for(int i = 0; i< deduplicateEvent.size(); i++) {
-			if(deduplicateEvent.get(i).kind().name().equals("EVENT_CREATE") || deduplicateEvent.get(i).kind().name().equals("EVENT_CREATE")) {
+		for(int i = 0; i< events.size(); i++) {
+			if(events.get(i).kind().name().equals("EVENT_CREATE") || events.get(i).kind().name().equals("EVENT_MODIFY")) {
 				int foundPosition = -1;
-				for(int j = i + 1; j < deduplicateEvent.size(); j++) {
-					if(deduplicateEvent.get(j).kind().name().equals("EVENT_DELETE") && 
-							(((Path)deduplicateEvent.get(j).context()).equals((Path)deduplicateEvent.get(j).context()))
+				for(int j = i + 1; j < events.size(); j++) {
+					if(events.get(j).kind().name().equals("EVENT_DELETE") && 
+							(((Path)events.get(j).context()).equals((Path)events.get(j).context()))
 									&& !blockList.contains(j)) {
 						foundPosition = j;
 						blockList.add(j);
@@ -127,18 +143,18 @@ public class WatchListener implements Runnable {
 					}
 				}
 				if(foundPosition == -1) {
-					filteredEvents.add(deduplicateEvent.get(i));
+					filteredEvents.add(events.get(i));
 				}
 			} else if(!blockList.contains(i)) {
-				filteredEvents.add(deduplicateEvent.get(i));
+				filteredEvents.add(events.get(i));
 			}
 		}
 		return filteredEvents;
 	}
 
-	private List<WatchEvent<?>> deduplicateEvent(List<WatchEvent<?>> pollEvents) {
+	private List<WatchEvent<?>> deduplicateEvent(List<WatchEvent<?>> events) {
 		List<WatchEvent<?>> filteredEvents = new ArrayList<>();
-		for(WatchEvent<?> event : pollEvents) {
+		for(WatchEvent<?> event : events) {
 			int foundPosition = -1;
 			for(int i = 0; i < filteredEvents.size(); i++) {
 				if(filteredEvents.get(i).kind().name().equals(event.kind().name())
