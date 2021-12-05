@@ -180,11 +180,13 @@ public class WatchListener implements Runnable {
 		String fullLocation = listenerPath + "/" + resourceName;
 		Path fullPath = Path.of(fullLocation);
 
+		boolean workAsDirectory = Files.isDirectory(fullPath);
+		
 		Operation operation = new Operation();
 		operation.setS3Action("ENTRY_CREATE".equals(event.kind().name()) ? 
 				S3Action.CREATE : "ENTRY_MODIFY".equals(event.kind().name()) ? 
 						S3Action.MODIFY : S3Action.DELETE);
-		if(Files.isDirectory(fullPath)) {
+		if(workAsDirectory) {
 			operation.setOnFile(fullLocation);
 		} else {
 			operation.setOnFile(fullLocation.replaceFirst(localRootFolder, ""));			
@@ -194,7 +196,7 @@ public class WatchListener implements Runnable {
 			case "ENTRY_CREATE":
 			case "ENTRY_MODIFY":
 				logger.debug("[[DEBUG]] Managing event CREATED on file {}", fullLocation);
-				if (fullPath.toFile().isDirectory()) {
+				if (workAsDirectory) {
 					logger.debug("[[DEBUG]] CREATE event on folder {}", fullLocation);
 					try {
 						Files.walkFileTree(fullPath, new SimpleFileVisitor<Path>() {
@@ -227,28 +229,33 @@ public class WatchListener implements Runnable {
 				break;
 			case "ENTRY_DELETE":
 				logger.debug("[[DEBUG]] Managing event DELETE on file {}", fullLocation);
-				if (directories.contains(fullLocation)) {
-					logger.debug("[[DEBUG]] DELETE event on folder {}", fullLocation);
-					if (watchKeys.containsKey(fullLocation)) {
-						logger.debug("[[DEBUG]] Kill watchKey and remote folder from tree");
-						watchKeys.get(fullLocation).cancel();
-						watchKeys.remove(fullLocation);
+				if(watchKeys.containsKey(fullLocation)) {
+	
+					if (directories.contains(fullLocation)) {
+						logger.debug("[[DEBUG]] DELETE event on folder {}", fullLocation);
+						if (watchKeys.containsKey(fullLocation)) {
+							logger.debug("[[DEBUG]] Kill watchKey and remote folder from tree");
+							watchKeys.get(fullLocation).cancel();
+							watchKeys.remove(fullLocation);
+						} else {
+							logger.warn("[[WARN]] WatchKey not found for this folder " + fullLocation);
+						}
+						logger.debug("[[DEBUG]] Delete all files in folder {}", fullLocation);
+						try {
+							uploadService.deleteAsFolder(remoteFolder, fullLocation.replaceFirst(localRootFolder, ""));
+							logger.debug("[[DEBUG]] Remove folder {} from the folders tree");
+							directories.remove(fullLocation);
+						} catch (Exception e) {
+							logger.error("Exception removing file {}", fullLocation, e);
+						}
 					} else {
-						logger.warn("[[WARN]] WatchKey not found for this folder " + fullLocation);
-					}
-					logger.debug("[[DEBUG]] Delete all files in folder {}", fullLocation);
-					try {
-						uploadService.deleteAsFolder(remoteFolder, fullLocation.replaceFirst(localRootFolder, ""));
-						logger.debug("[[DEBUG]] Remove folder {} from the folders tree");
-						directories.remove(fullLocation);
-					} catch (Exception e) {
-						logger.error("Exception removing file {}", fullLocation, e);
+						logger.debug("[[DEBUG]] DELETE event on file " + fullLocation);
+						if (!uploadService.delete(remoteFolder, fullLocation.replaceFirst(localRootFolder, ""))) {
+							logger.error("[[ERROR]] Error deleting file {} from S3", fullLocation);
+						}
 					}
 				} else {
-					logger.debug("[[DEBUG]] DELETE event on file " + fullLocation);
-					if (!uploadService.delete(remoteFolder, fullLocation.replaceFirst(localRootFolder, ""))) {
-						logger.error("[[ERROR]] Error deleting file {} from S3", fullLocation);
-					}
+					logger.info("[[INFO]] Deleted folder was not in listening. Doing nothing...");
 				}
 				break;
 			default:

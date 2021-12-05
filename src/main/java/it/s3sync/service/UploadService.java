@@ -290,7 +290,7 @@ public class UploadService {
 					long lastModified = 0L;
 					lastModified = Files.getLastModifiedTime(fullPath).toMillis();
 					File file = path.toFile();
-					if (file.isFile() && file.canRead()
+					if (!file.isDirectory() && file.canRead()
 							&& FileUtils.notMatchFilters(synchronizationService.getExclusionPattern(localRootFolder),
 									path.toString().replaceFirst(localRootFolder, ""))) {
 						if (toMatchMap.containsKey(path.toString())) {
