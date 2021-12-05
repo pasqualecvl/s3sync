@@ -86,7 +86,7 @@ public class UploadService {
 		
 		logger.debug("Uploading {} to s3 folder {} with relative path {}", path, remoteFolder, relativePath);
 		try {
-			if(item == null || !FileUtils.checkForDifferentChecksum(item.getChecksum(), path)) {
+			if(item == null || FileUtils.checkForDifferentChecksum(item.getChecksum(), path)) {
 				PutObjectRequest objectRequest = PutObjectRequest.builder()
 						.bucket(GlobalPropertiesManager.getProperty("s3.bucket")).key(remoteFolder + relativePath).build();
 				PutObjectResponse response = s3Client.putObject(objectRequest, path);

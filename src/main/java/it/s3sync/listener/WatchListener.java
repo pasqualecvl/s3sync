@@ -230,7 +230,6 @@ public class WatchListener implements Runnable {
 			case "ENTRY_DELETE":
 				logger.debug("[[DEBUG]] Managing event DELETE on file {}", fullLocation);
 				if(watchKeys.containsKey(fullLocation)) {
-	
 					if (directories.contains(fullLocation)) {
 						logger.debug("[[DEBUG]] DELETE event on folder {}", fullLocation);
 						if (watchKeys.containsKey(fullLocation)) {
