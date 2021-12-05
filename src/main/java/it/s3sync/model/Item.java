@@ -21,6 +21,8 @@ public class Item {
 	
 	private Boolean deleted = false;
 	
+	private String checksum;
+	
 	public BigInteger get_id() {
 		return _id;
 	}
@@ -71,6 +73,14 @@ public class Item {
 	
 	public Item get() {
 		return this;
+	}
+	
+	public String getChecksum() {
+		return checksum;
+	}
+	
+	public void setChecksum(String checksum) {
+		this.checksum = checksum;
 	}
 
 	@Override

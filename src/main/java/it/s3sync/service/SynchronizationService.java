@@ -163,7 +163,7 @@ public class SynchronizationService {
 					} else {
 						if (item.getUploadedBy().equals(UserSpecificPropertiesManager.getConfiguration().getAlias())) {
 							// deleted items -> uploaded by current user but not found on local machine
-							if (!Path.of(itemLocalFullLocation).toFile().exists()) {
+							if (!itemLocalFullPath.toFile().exists()) {
 								logger.debug("[[DEBUG]] Deleting item {} uploaded by the current user which not exists on local filesystem", itemLocalFullLocation);
 								if (!uploadService.delete(remoteFolder, item.getOriginalName())) {
 									logger.error("[[ERROR]] Error deleting s3 file {}/{}", remoteFolder, item.getOriginalName());
@@ -174,11 +174,11 @@ public class SynchronizationService {
 						// check for file exists
 						if (Files.exists(itemLocalFullPath)) {
 							// check for obsolete file
-							if (itemLocalFullPath.toFile().lastModified() < item.getLastUpdate()) {
+							if (itemLocalFullPath.toFile().lastModified() < item.getLastUpdate() &&
+									FileUtils.checkForDifferentChecksum(item.getChecksum(), itemLocalFullPath)) {
 								logger.debug("[[DEBUG]] File {} is out to date, updating...", itemLocalFullLocation);
 								// file is obsolete, go for update
-								uploadService.getOrUpdate(itemLocalFullLocation,
-										item.getOwnedByFolder() + item.getOriginalName(), item.getLastUpdate());
+								uploadService.getOrUpdate(itemLocalFullLocation, item);
 								// update created file last modified to prevent synchronization loop
 								try {
 									logger.debug("[[DEBUG]] Setting file {} last modified same as the remote one: {}", itemLocalFullLocation, item.getLastUpdate());
@@ -189,8 +189,7 @@ public class SynchronizationService {
 							}
 						} else {
 							logger.debug("File {}/{} not found in the local folder {}", remoteFolder, item.getOriginalName(), localRootFolder);
-							uploadService.getOrUpdate(itemLocalFullLocation, item.getOwnedByFolder() + item.getOriginalName(),
-									item.getLastUpdate());
+							uploadService.getOrUpdate(itemLocalFullLocation, item);
 							try {
 								logger.debug("[[DEBUG]] Setting file {} last modified same as the remote one: {}", itemLocalFullLocation, item.getLastUpdate());
 								Files.setLastModifiedTime(itemLocalFullPath, FileTime.fromMillis(item.getLastUpdate()));

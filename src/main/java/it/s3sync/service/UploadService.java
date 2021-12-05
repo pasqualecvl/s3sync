@@ -86,35 +86,38 @@ public class UploadService {
 		
 		logger.debug("Uploading {} to s3 folder {} with relative path {}", path, remoteFolder, relativePath);
 		try {
-			PutObjectRequest objectRequest = PutObjectRequest.builder()
-					.bucket(GlobalPropertiesManager.getProperty("s3.bucket")).key(remoteFolder + relativePath).build();
-			PutObjectResponse response = s3Client.putObject(objectRequest, path);
-			if (response.sdkHttpResponse().isSuccessful()) {
-				logger.debug("[[DEBUG]] Uploading {} to {} successfully", relativePath, remoteFolder);
-				boolean isCreate = false;
-				if (item == null) {
-					logger.debug(
-							"Item never synchronized, create new Item with originalName {} and owning folder {} in DB",
-							relativePath, remoteFolder);
-					isCreate = true;
-					item = new Item();
-					item.setOriginalName(relativePath);
-					item.setOwnedByFolder(remoteFolder);
+			if(item == null || !FileUtils.checkForDifferentChecksum(item.getChecksum(), path)) {
+				PutObjectRequest objectRequest = PutObjectRequest.builder()
+						.bucket(GlobalPropertiesManager.getProperty("s3.bucket")).key(remoteFolder + relativePath).build();
+				PutObjectResponse response = s3Client.putObject(objectRequest, path);
+				if (response.sdkHttpResponse().isSuccessful()) {
+					logger.debug("[[DEBUG]] Uploading {} to {} successfully", relativePath, remoteFolder);
+					boolean isCreate = false;
+					if (item == null) {
+						logger.debug(
+								"Item never synchronized, create new Item with originalName {} and owning folder {} in DB",
+								relativePath, remoteFolder);
+						isCreate = true;
+						item = new Item();
+						item.setOriginalName(relativePath);
+						item.setOwnedByFolder(remoteFolder);
+					}
+					item.setChecksum(FileUtils.getChecksum(path));
+					item.setDeleted(false);
+					item.setLastUpdate(lastModified);
+					item.setUploadedBy(UserSpecificPropertiesManager.getConfiguration().getAlias());
+					logger.trace("[[TRACE]] Writing item on mongo: {}", item);
+					mongoOperations.save(item);
+					SynchronizationMessageDto dto = new SynchronizationMessageDto();
+					dto.setFile(relativePath);
+					dto.setRemoteFolder(remoteFolder);
+					dto.setSource(UserSpecificPropertiesManager.getConfiguration().getAlias());
+					dto.setS3Action(isCreate ? S3Action.CREATE : S3Action.MODIFY);
+					dto.setTime(lastModified);
+					logger.debug("[[DEBUG]] Sending fanout notification through MQ");
+					logger.trace("[[TRACE]] MQ Dto content: {}", dto);
+					amqpTemplate.convertAndSend(dto);
 				}
-				item.setDeleted(false);
-				item.setLastUpdate(lastModified);
-				item.setUploadedBy(UserSpecificPropertiesManager.getConfiguration().getAlias());
-				logger.trace("[[TRACE]] Writing item on mongo: {}", item);
-				mongoOperations.save(item);
-				SynchronizationMessageDto dto = new SynchronizationMessageDto();
-				dto.setFile(relativePath);
-				dto.setRemoteFolder(remoteFolder);
-				dto.setSource(UserSpecificPropertiesManager.getConfiguration().getAlias());
-				dto.setS3Action(isCreate ? S3Action.CREATE : S3Action.MODIFY);
-				dto.setTime(lastModified);
-				logger.debug("[[DEBUG]] Sending fanout notification through MQ");
-				logger.trace("[[TRACE]] MQ Dto content: {}", dto);
-				amqpTemplate.convertAndSend(dto);
 			}
 		} catch (UncheckedIOException e) {
 			logger.error("[[ERROR]] Exception removing file {}", relativePath, e);
@@ -129,15 +132,23 @@ public class UploadService {
 
 	}
 
-	public List<String> getOrUpdate(String localFullPathFolder, String remoteFullPathFolder, long lastModified) {
+	public List<String> getOrUpdate(String localFullPathFolder, Item item) {
+		String remoteFullPathFolder = item.getOwnedByFolder() + item.getOriginalName();
+		long lastModified = item.getLastUpdate();			
 		try {
-			logger.info("[[INFO]] Fetch or update file {} from remote folder {}", localFullPathFolder,
-					remoteFullPathFolder);
-			GetObjectRequest request = GetObjectRequest.builder().bucket(GlobalPropertiesManager.getProperty("s3.bucket"))
-					.key(remoteFullPathFolder).build();
-			ResponseInputStream<GetObjectResponse> response = s3Client.getObject(request);
-				logger.debug("[[DEBUG]] Creating folder tree for file {}", localFullPathFolder);
-			return FileUtils.createFileTree(localFullPathFolder, response.readAllBytes(), lastModified);
+			Path path = Path.of(localFullPathFolder);
+			File file = path.toFile();
+			if(!file.exists() || (file.exists() && file.isFile() && FileUtils.checkForDifferentChecksum(item.getChecksum(), path))) {
+				logger.info("[[INFO]] Fetch or update file {} from remote folder {}", localFullPathFolder,
+						remoteFullPathFolder);
+				GetObjectRequest request = GetObjectRequest.builder().bucket(GlobalPropertiesManager.getProperty("s3.bucket"))
+						.key(remoteFullPathFolder).build();
+				ResponseInputStream<GetObjectResponse> response = s3Client.getObject(request);
+					logger.debug("[[DEBUG]] Creating folder tree for file {}", localFullPathFolder);
+				return FileUtils.createFileTree(localFullPathFolder, response.readAllBytes(), lastModified);
+			} else {
+				logger.info("[[INFO]] Trying update file {} with the same checksum. Discarded", item.getOriginalName());
+			}
 		} catch (IOException e) {
 			logger.error("Exception creating file tree. File {} not synchronized", localFullPathFolder, e);
 		} catch(NoSuchKeyException e) {
@@ -285,7 +296,7 @@ public class UploadService {
 						if (toMatchMap.containsKey(path.toString())) {
 							if (toMatchMap.get(relativePath).getLastUpdate() > lastModified) {
 								logger.debug("[[DEBUG]] File {} in synchronizing folder is out to date. Updating...", path.toString());
-								getOrUpdate(path.toString(), relativePath, lastModified);
+								getOrUpdate(path.toString(), toMatchMap.get(relativePath));
 							} else {
 								logger.debug("[[DEBUG]] File {} in synchronizing must be uploaded", path.toString());
 								try {

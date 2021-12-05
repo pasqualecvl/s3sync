@@ -95,7 +95,6 @@ public class WatchListener implements Runnable {
 											event.kind(), watchKey.watchable().toString(), e);
 								}
 							}
-							WatchListeners.cleanChangesWhileLocked(watchKey.watchable().toString());
 							watchKey.reset();
 						}
 						solved = true;
@@ -181,25 +180,14 @@ public class WatchListener implements Runnable {
 		String fullLocation = listenerPath + "/" + resourceName;
 		Path fullPath = Path.of(fullLocation);
 
-		boolean workAsDirectoryEvent = false;
 		Operation operation = new Operation();
+		operation.setS3Action("ENTRY_CREATE".equals(event.kind().name()) ? 
+				S3Action.CREATE : "ENTRY_MODIFY".equals(event.kind().name()) ? 
+						S3Action.MODIFY : S3Action.DELETE);
 		if(Files.isDirectory(fullPath)) {
-			workAsDirectoryEvent = true;
-			operation.setS3Action("ENTRY_CREATE".equals(event.kind().name()) ? 
-					S3Action.CREATE : "ENTRY_MODIFY".equals(event.kind().name()) ? 
-							S3Action.MODIFY : S3Action.DELETE);
 			operation.setOnFile(fullLocation);
 		} else {
-			operation.setS3Action("ENTRY_CREATE".equals(event.kind().name()) ? 
-					S3Action.CREATE : "ENTRY_MODIFY".equals(event.kind().name()) ? 
-							S3Action.MODIFY : S3Action.DELETE);
 			operation.setOnFile(fullLocation.replaceFirst(localRootFolder, ""));			
-		}
-		String rootKey = workAsDirectoryEvent ? fullLocation : fullLocation.substring(0, fullLocation.lastIndexOf('/'));
-		if (WatchListeners.checkForProgrammaticallyChange(rootKey, operation)) {
-			logger.info("[[INFO]] Event on {} for file {} was made by s3sync. Skipped.", localRootFolder, fullLocation);
-
-			return;
 		}
 		if (FileUtils.notMatchFilters(synchronizationService.getExclusionPattern(localRootFolder), fullLocation)) {
 			switch (event.kind().name()) {

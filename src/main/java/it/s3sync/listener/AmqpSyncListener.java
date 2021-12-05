@@ -7,12 +7,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.data.mongodb.core.MongoOperations;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.json.JsonMapper;
 
 import it.s3sync.listener.SynchronizationMessageDto.S3Action;
 import it.s3sync.listener.WatchListeners.Operation;
+import it.s3sync.model.Item;
 import it.s3sync.service.SynchronizationService;
 import it.s3sync.service.UploadService;
 import it.s3sync.utils.FileUtils;
@@ -32,14 +36,16 @@ public class AmqpSyncListener {
 
 	@Autowired
 	private SynchronizationService synchronizationService;
+	
+	@Autowired
+	private MongoOperations mongoOperations;
 
 	public void receiveSyncMessage(SynchronizationMessageDto dto) {
 		WatchListeners.lockSemaphore();
 		logger.info("Locking WatchListeners");
 		try {
 			if (!dto.getSource().equals(UserSpecificPropertiesManager.getConfiguration().getAlias())) {
-				String localFolder = synchronizationService
-						.getSynchronizedLocalRootFolderByRemoteFolder(dto.getRemoteFolder());
+				String localFolder = synchronizationService.getSynchronizedLocalRootFolderByRemoteFolder(dto.getRemoteFolder());
 				if (localFolder != null) {
 					// lock event on file
 					// FIXME: since watchKey will be create by a thread AFTER the file is
@@ -48,8 +54,10 @@ public class AmqpSyncListener {
 					// WatchListeners.putChangesWhileLocked(localFolder, dto.getFile());
 					logger.info("Serving action: " + dto.toString());
 					if (S3Action.CREATE.equals(dto.getS3Action()) || S3Action.MODIFY.equals(dto.getS3Action())) {
-						List<String> folders = uploadService.getOrUpdate(localFolder + dto.getFile(),
-								dto.getRemoteFolder() + dto.getFile(), dto.getTime());
+						Item item = mongoOperations.findOne(
+								new Query(Criteria.where("ownedByFolder").is(dto.getRemoteFolder()).and("originalName").is(dto.getFile())),
+								Item.class);
+						List<String> folders = uploadService.getOrUpdate(localFolder + dto.getFile(), item);
 						if (folders.size() > 0) {
 							for (String folder : folders) {
 								// if a new folder will be created, current watchers will throw an event on the
@@ -63,13 +71,11 @@ public class AmqpSyncListener {
 								Operation operation = new Operation();
 								operation.setOnFile(folder);
 								operation.setS3Action(dto.getS3Action());
-								WatchListeners.putChangesWhileLocked(folder, operation);
 							}
 						}						
 						Operation operation = new Operation();
 						operation.setOnFile(localFolder + dto.getFile());
 						operation.setS3Action(dto.getS3Action());
-						WatchListeners.putChangesWhileLocked((localFolder + dto.getFile()).substring(0, (localFolder + dto.getFile()).lastIndexOf('/')), operation);
 					} else if (S3Action.DELETE.equals(dto.getS3Action())) {
 						long localFileLastModified = Path.of(localFolder + dto.getFile()).toFile().lastModified();
 						if (localFileLastModified <= dto.getTime()) {

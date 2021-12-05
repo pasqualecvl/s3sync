@@ -1,8 +1,5 @@
 package it.s3sync.listener;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -18,8 +15,6 @@ import it.s3sync.service.UploadService;
 public class WatchListeners {
 
 	private static Map<String, ThreadAndRunnable> threadPool = new HashMap<>();
-
-	private static volatile Map<String, Collection<Operation>> changesWhileLocked = new HashMap<>();
 
 	private static volatile int threadSemaphore = 0;
 
@@ -72,46 +67,6 @@ public class WatchListeners {
 		logger.debug(WatchListeners.threadSemaphore == 0 ? "Semaphore not locked"
 				: "Semaphore locked with value {} ", threadSemaphore);
 		return WatchListeners.threadSemaphore == 0;
-	}
-
-	public static void putChangesWhileLocked(String folder, Operation operation) {
-		synchronized (changesWhileLocked) {
-			logger.debug("[[DEBUG]] Changing {} on file {} was made on folder {} programmatically by listener", 
-					operation.getS3Action(), operation.getOnFile(), folder);
-			if (changesWhileLocked.containsKey(folder)) {
-				Collection<Operation> fileForFolder = changesWhileLocked.get(folder);
-				if (fileForFolder == null) {
-					fileForFolder = Collections.synchronizedCollection(new ArrayList<>());
-				}
-				fileForFolder.add(operation);
-				changesWhileLocked.put(folder, fileForFolder);
-			} else {
-				Collection<Operation> fileForFolder = Collections.synchronizedCollection(new ArrayList<>());
-				fileForFolder.add(operation);
-				changesWhileLocked.put(folder, fileForFolder);
-			}
-		}
-	}
-
-	public static boolean checkForProgrammaticallyChange(String folder, Operation operation) {
-		if (changesWhileLocked.containsKey(folder) && changesWhileLocked.get(folder) != null
-				&& changesWhileLocked.get(folder).contains(operation)) {
-			logger.debug("[[DEBUG]] Event {} on file {}/{} suppressed because it was modified by S3Sync.",
-					operation.getS3Action(), folder, operation.getOnFile());
-			synchronized (changesWhileLocked) {
-				changesWhileLocked.get(folder).remove(operation);
-			}
-			return true;
-		} else {
-			logger.debug("[[DEBUG]] Event {} on file {}/{} must be served.", operation.getS3Action(), folder, operation.getOnFile());
-			return false;
-		}
-	}
-
-	public static void cleanChangesWhileLocked(String syncFolder) {
-		synchronized (changesWhileLocked) {
-			changesWhileLocked.put(syncFolder, new ArrayList<>());
-		}
 	}
 	
 	public static class ThreadAndRunnable {

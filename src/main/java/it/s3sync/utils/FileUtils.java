@@ -1,5 +1,7 @@
 package it.s3sync.utils;
 
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -14,6 +16,7 @@ import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.util.DigestUtils;
 
 public class FileUtils {
 
@@ -98,6 +101,28 @@ public class FileUtils {
 			}
 		}
 		return true;
+	}
+
+	public static boolean checkForDifferentChecksum(String checksum, Path itemLocalFullPath) {
+		String localChecksum;
+		try {
+			localChecksum = DigestUtils.md5DigestAsHex(new FileInputStream(itemLocalFullPath.toFile()));
+		} catch (FileNotFoundException e) {
+			logger.error("File not found {}", itemLocalFullPath.toString());
+			return false;
+		} catch (IOException e) {
+			logger.error("IOException on file {}", itemLocalFullPath.toString());
+			return false;
+		}
+		return !localChecksum.equals(checksum);
+	}
+
+	public static String getChecksum(Path path) {
+		try {
+			return DigestUtils.md5DigestAsHex(new FileInputStream(path.toFile()));
+		} catch (IOException e) {
+			throw new RuntimeException("Exception computing checksum on file " + path.toString());
+		}
 	}
 	
 }
