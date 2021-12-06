@@ -28,9 +28,12 @@ import com.sun.nio.file.SensitivityWatchEventModifier;
 
 import it.s3sync.listener.SynchronizationMessageDto.S3Action;
 import it.s3sync.listener.WatchListeners.Operation;
+import it.s3sync.model.AttachedClient;
+import it.s3sync.model.AttachedClient.SyncFolder;
 import it.s3sync.service.SynchronizationService;
 import it.s3sync.service.UploadService;
 import it.s3sync.utils.FileUtils;
+import it.s3sync.utils.UserSpecificPropertiesManager;
 
 public class WatchListener implements Runnable {
 
@@ -213,7 +216,7 @@ public class WatchListener implements Runnable {
 								return FileVisitResult.CONTINUE;
 							}
 						});
-						uploadService.uploadAsFolder(fullPath, localRootFolder, remoteFolder);
+//						uploadService.uploadAsFolder(fullPath, localRootFolder, remoteFolder);
 					} catch (IOException e) {
 						logger.error("Exception", e);
 					}
@@ -242,9 +245,20 @@ public class WatchListener implements Runnable {
 							}
 							logger.debug("[[DEBUG]] Delete all files in folder {}", fullLocation);
 							try {
-								uploadService.deleteAsFolder(remoteFolder, fullLocation.replaceFirst(localRootFolder, ""));
+								String relativeLocation = fullLocation.replaceFirst(localRootFolder, "");
+								if (relativeLocation.isBlank()) {
+									synchronizationService.removeSynchronizationFolder(
+											synchronizationService.getSynchronizedLocalRootFolderByRemoteFolder(remoteFolder));
+								} else {
+									synchronizationService.addSynchronizationExclusionPattern(
+											synchronizationService.getSynchronizedLocalRootFolderByRemoteFolder(remoteFolder),
+											"^" + relativeLocation);
+								}
+//								uploadService.deleteAsFolder(remoteFolder, );
 								logger.debug("[[DEBUG]] Remove folder {} from the folders tree");
-								directories.remove(fullLocation);
+								if(directories.contains(fullLocation)) {
+									directories.remove(fullLocation);									
+								}
 							} catch (Exception e) {
 								logger.error("Exception removing file {}", fullLocation, e);
 							}

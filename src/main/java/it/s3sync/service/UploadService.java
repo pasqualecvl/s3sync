@@ -3,16 +3,9 @@ package it.s3sync.service;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
-
-import javax.swing.Box.Filler;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,7 +22,6 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import it.s3sync.exception.PreventUploadForFolderException;
 import it.s3sync.listener.SynchronizationMessageDto;
 import it.s3sync.listener.SynchronizationMessageDto.S3Action;
-import it.s3sync.model.AttachedClient;
 import it.s3sync.model.Item;
 import it.s3sync.model.SharedData;
 import it.s3sync.utils.FileUtils;
@@ -65,8 +57,8 @@ public class UploadService {
 	@Autowired
 	private AmqpTemplate amqpTemplate;
 
-	@Autowired
-	private SynchronizationService synchronizationService;
+//	@Autowired
+//	private SynchronizationService synchronizationService;
 
 	@Autowired
 	@Qualifier("sqsJsonMapper")
@@ -86,7 +78,7 @@ public class UploadService {
 
 		logger.debug("Uploading {} to s3 folder {} with relative path {}", path, remoteFolder, relativePath);
 		try {
-			if (item == null || FileUtils.checkForDifferentChecksum(item.getChecksum(), path)) {
+			if (item == null || item.getDeleted() ||  FileUtils.checkForDifferentChecksum(item.getChecksum(), path)) {
 				PutObjectRequest objectRequest = PutObjectRequest.builder()
 						.bucket(GlobalPropertiesManager.getProperty("s3.bucket")).key(remoteFolder + relativePath)
 						.build();
@@ -228,7 +220,7 @@ public class UploadService {
 		}
 	}
 
-	public void deleteAsFolder(String remoteFolder, String relativeLocation) {
+/*	public void deleteAsFolder(String remoteFolder, String relativeLocation) {
 		logger.debug("[[DEBUG]] Deleting localFolder {} from remote {}", relativeLocation, remoteFolder);
 		AttachedClient currentUser = UserSpecificPropertiesManager.getConfiguration();
 
@@ -284,8 +276,9 @@ public class UploadService {
 			}
 		}
 	}
-
-	public void uploadAsFolder(Path fullPath, String localRootFolder, String remoteFolder) {
+*/
+/*
+  	public void uploadAsFolder(Path fullPath, String localRootFolder, String remoteFolder) {
 		String relativePath = fullPath.toString().replaceFirst(localRootFolder, "");
 		List<Item> toMatch = mongoOperations.find(
 				new Query(
@@ -310,7 +303,7 @@ public class UploadService {
 							} else {
 								logger.debug("[[DEBUG]] File {} in synchronizing must be uploaded", path.toString());
 								try {
-									upload(path, remoteFolder, relativePath, toMatchMap.get(relativePath),
+									upload(path, fullPath.toString().replaceFirst(localRootFolder, ""), remoteFolder, toMatchMap.get(relativePath),
 											lastModified);
 								} catch (PreventUploadForFolderException e) {
 									logger.error("[[ERROR]] Trying to upload folder {}, prevented by default",
@@ -321,7 +314,7 @@ public class UploadService {
 							logger.debug(
 									"[[DEBUG]] File {} in synchronizing folder not present in remote one, Uploading...",
 									path.toString());
-							upload(path, remoteFolder, relativePath, lastModified);
+							upload(path, fullPath.toString().replaceFirst(localRootFolder, ""), remoteFolder, lastModified);
 						}
 					}
 				} catch (IOException e) {
@@ -333,8 +326,9 @@ public class UploadService {
 			logger.error("Exception walking filesystem for local folder {}", fullPath.toString(), e);
 		}
 	}
-
-	private void removeRemoteFolder(String remoteFolder) {
+*/
+	
+	public void removeRemoteFolder(String remoteFolder) {
 		List<SharedData> data = mongoOperations.findAll(SharedData.class);
 		if (data.size() != 1) {
 			throw new RuntimeException("SharedData must contains exactly one document");
