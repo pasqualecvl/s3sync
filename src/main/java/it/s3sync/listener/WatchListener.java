@@ -229,32 +229,34 @@ public class WatchListener implements Runnable {
 				break;
 			case "ENTRY_DELETE":
 				logger.debug("[[DEBUG]] Managing event DELETE on file {}", fullLocation);
-				if(watchKeys.containsKey(fullLocation)) {
-					if (directories.contains(fullLocation)) {
-						logger.debug("[[DEBUG]] DELETE event on folder {}", fullLocation);
-						if (watchKeys.containsKey(fullLocation)) {
-							logger.debug("[[DEBUG]] Kill watchKey and remote folder from tree");
-							watchKeys.get(fullLocation).cancel();
-							watchKeys.remove(fullLocation);
-						} else {
-							logger.warn("[[WARN]] WatchKey not found for this folder " + fullLocation);
-						}
-						logger.debug("[[DEBUG]] Delete all files in folder {}", fullLocation);
-						try {
-							uploadService.deleteAsFolder(remoteFolder, fullLocation.replaceFirst(localRootFolder, ""));
-							logger.debug("[[DEBUG]] Remove folder {} from the folders tree");
-							directories.remove(fullLocation);
-						} catch (Exception e) {
-							logger.error("Exception removing file {}", fullLocation, e);
+				if(workAsDirectory) {
+					if(watchKeys.containsKey(fullLocation)) {
+						if (directories.contains(fullLocation)) {
+							logger.debug("[[DEBUG]] DELETE event on folder {}", fullLocation);
+							if (watchKeys.containsKey(fullLocation)) {
+								logger.debug("[[DEBUG]] Kill watchKey and remote folder from tree");
+								watchKeys.get(fullLocation).cancel();
+								watchKeys.remove(fullLocation);
+							} else {
+								logger.warn("[[WARN]] WatchKey not found for this folder " + fullLocation);
+							}
+							logger.debug("[[DEBUG]] Delete all files in folder {}", fullLocation);
+							try {
+								uploadService.deleteAsFolder(remoteFolder, fullLocation.replaceFirst(localRootFolder, ""));
+								logger.debug("[[DEBUG]] Remove folder {} from the folders tree");
+								directories.remove(fullLocation);
+							} catch (Exception e) {
+								logger.error("Exception removing file {}", fullLocation, e);
+							}
 						}
 					} else {
-						logger.debug("[[DEBUG]] DELETE event on file " + fullLocation);
-						if (!uploadService.delete(remoteFolder, fullLocation.replaceFirst(localRootFolder, ""))) {
-							logger.error("[[ERROR]] Error deleting file {} from S3", fullLocation);
-						}
+						logger.info("[[INFO]] Deleted folder was not in listening. Doing nothing...");
 					}
 				} else {
-					logger.info("[[INFO]] Deleted folder was not in listening. Doing nothing...");
+					logger.debug("[[DEBUG]] DELETE event on file " + fullLocation);
+					if (!uploadService.delete(remoteFolder, fullLocation.replaceFirst(localRootFolder, ""))) {
+						logger.error("[[ERROR]] Error deleting file {} from S3", fullLocation);
+					}
 				}
 				break;
 			default:
