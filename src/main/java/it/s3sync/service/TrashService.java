@@ -30,7 +30,7 @@ public class TrashService {
 	public Folder navigate(String relativePath) {
 		logger.info("[[INFO]] List elements with root key {}", relativePath);
 		String s3bucket = GlobalPropertiesManager.getProperty("s3.bucket");
-		ListObjectsV2Request request = ListObjectsV2Request.builder().bucket(s3bucket).prefix(relativePath).build();
+		ListObjectsV2Request request = ListObjectsV2Request.builder().bucket(s3bucket).prefix("Trash/" + relativePath).build();
 		List<String> keys = new ArrayList<>();
 		ListObjectsV2Response list = null;
 		do {
