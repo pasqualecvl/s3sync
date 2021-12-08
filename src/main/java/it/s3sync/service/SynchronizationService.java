@@ -111,7 +111,7 @@ public class SynchronizationService {
 		Map<String, Item> mapItems = items.stream().collect(Collectors.toMap(Item::getOriginalName, Item::get));
 		Files.walk(Paths.get(localRootFolder)).forEach(path -> {
 			File file = path.toFile();
-			if (file.isFile() && file.canRead() && FileUtils.notMatchFilters(exclusionPatterns.get(localRootFolder),
+			if (!file.isDirectory() && file.canRead() && FileUtils.notMatchFilters(exclusionPatterns.get(localRootFolder),
 					path.toString().replaceFirst(localRootFolder, ""))) {
 				String relativePath = file.getAbsolutePath().replaceFirst(localRootFolder, "");
 				if (!mapItems.containsKey(relativePath) || (mapItems.containsKey(relativePath)
@@ -208,6 +208,9 @@ public class SynchronizationService {
 	}
 
 	public void removeSynchronizationFolder(String localRootFolder) {
+		if(localRootFolder == null) {
+			return;
+		}
 		synchronized (synchronizedFolder) {
 			synchronizedFolder.remove(localRootFolder);
 		}
