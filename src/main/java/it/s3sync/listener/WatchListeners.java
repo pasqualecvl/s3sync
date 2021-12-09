@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,11 +14,13 @@ import it.s3sync.service.SynchronizationService;
 import it.s3sync.service.UploadService;
 
 public class WatchListeners {
+	
+	private WatchListeners() { }
 
 	private static Map<String, ThreadAndRunnable> threadPool = new HashMap<>();
 
-	private static volatile int threadSemaphore = 0;
-
+	private static AtomicInteger threadSemaphore = new AtomicInteger(0);
+	
 	private static final Logger logger = LoggerFactory.getLogger(WatchListeners.class);
 
 	public static void startThread(UploadService uploadService, SynchronizationService synchronizationService,
@@ -54,19 +57,18 @@ public class WatchListeners {
 	}
 	
 	public static void lockSemaphore() {
-		logger.debug("[[DEBUG]] Semaphore change from {} to {}", WatchListeners.threadSemaphore, WatchListeners.threadSemaphore + 1);
-		WatchListeners.threadSemaphore++;
+		logger.debug("[[DEBUG]] Semaphore change from {} to {}", WatchListeners.threadSemaphore.get(), WatchListeners.threadSemaphore.incrementAndGet());
 	}
 
 	public static void releaseSemaphore() {
-		logger.debug("[[DEBUG]] Semaphore change from {} to {}", WatchListeners.threadSemaphore, WatchListeners.threadSemaphore - 1);
-		WatchListeners.threadSemaphore--;
+		logger.debug("[[DEBUG]] Semaphore change from {} to {}", WatchListeners.threadSemaphore.get(), WatchListeners.threadSemaphore.decrementAndGet());
+		;
 	}
 
 	public static boolean threadNotLocked() {
-		logger.debug(WatchListeners.threadSemaphore == 0 ? "Semaphore not locked"
-				: "Semaphore locked with value {} ", threadSemaphore);
-		return WatchListeners.threadSemaphore == 0;
+		logger.debug(WatchListeners.threadSemaphore.get() == 0 ? "Semaphore not locked"
+				: "Semaphore locked with value {} ", threadSemaphore.get());
+		return WatchListeners.threadSemaphore.get() == 0;
 	}
 	
 	public static class ThreadAndRunnable {

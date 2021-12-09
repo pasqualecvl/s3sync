@@ -28,12 +28,9 @@ import com.sun.nio.file.SensitivityWatchEventModifier;
 
 import it.s3sync.listener.SynchronizationMessageDto.S3Action;
 import it.s3sync.listener.WatchListeners.Operation;
-import it.s3sync.model.AttachedClient;
-import it.s3sync.model.AttachedClient.SyncFolder;
 import it.s3sync.service.SynchronizationService;
 import it.s3sync.service.UploadService;
 import it.s3sync.utils.FileUtils;
-import it.s3sync.utils.UserSpecificPropertiesManager;
 
 public class WatchListener implements Runnable {
 
@@ -61,8 +58,6 @@ public class WatchListener implements Runnable {
 	@Override
 	public void run() {
 		try {
-			// Operation locked by batch processes (like startup synchonization, batch
-			// synchronization, etc)
 			logger.debug("[[DEBUG]] Creating watchService for local folder {} working on remote folder {}",
 					localRootFolder, remoteFolder);
 			watchService = FileSystems.getDefault().newWatchService();
@@ -83,19 +78,22 @@ public class WatchListener implements Runnable {
 			while (true) {
 				// Timeout needed because sometimes maps must be reloaded
 				WatchKey watchKey = watchService.poll(60, TimeUnit.SECONDS);
-				// Operation locked by batch processes (like startup synchonization, batch
-				// synchronization, etc)
 				boolean solved = false;
 				do {
+					// Operation locked by batch processes (like startup synchonization, batch
+					// synchronization, etc)
 					if (WatchListeners.threadNotLocked()) {
 						if (watchKey != null) {
 							for (WatchEvent<?> event : sanitize(watchKey.pollEvents(), watchKey)) {
-								logger.debug("[[DEBUG]] Managing event {}", event.toString());
+								logger.debug("[[DEBUG]] Managing event {}", event);
 								try {
+									//TODO: caching events and serving them through fixed size thread pool
+									//   NOTE: look up for concurrent upload on the same file and kill it -> bind thread to file full path
+									//	 NOTE2: managing folder create requires full scan and synchronization (same as startup sync) because some files might have been created before the listener started
 									managingEvent(event, watchKey.watchable());
 								} catch (Exception e) {
 									logger.error("[[ERROR]] Exception managing event {} on {}, proceed with next",
-											event.kind(), watchKey.watchable().toString(), e);
+											event.kind(), watchKey.watchable(), e);
 								}
 							}
 							watchKey.reset();
@@ -121,7 +119,8 @@ public class WatchListener implements Runnable {
 		for(int i = 0; i< events.size(); i++) {
 			if(events.get(i).kind().name().equals("EVENT_CREATE") && 
 					Files.isDirectory(Path.of(watchKey.watchable().toString() + events.get(i).context().toString()))) {
-				logger.trace("[[TRACE]] Discarding event on {} because it is a CRAETE on a folder (must do nothing)");
+				logger.trace("[[TRACE]] Discarding event on {} because it is a CRAETE on a folder (must do nothing)",
+						watchKey.watchable().toString() + events.get(i).context().toString());
 			} else {
 				filteredEvents.add(events.get(i));
 			}
@@ -137,7 +136,7 @@ public class WatchListener implements Runnable {
 				int foundPosition = -1;
 				for(int j = i + 1; j < events.size(); j++) {
 					if(events.get(j).kind().name().equals("EVENT_DELETE") && 
-							(((Path)events.get(j).context()).equals((Path)events.get(j).context()))
+							(((Path)events.get(j).context()).equals(events.get(j).context()))
 									&& !blockList.contains(j)) {
 						foundPosition = j;
 						blockList.add(j);
@@ -161,7 +160,6 @@ public class WatchListener implements Runnable {
 			for(int i = 0; i < filteredEvents.size(); i++) {
 				if(filteredEvents.get(i).kind().name().equals(event.kind().name())
 						&& ((Path)filteredEvents.get(i).context()).equals((Path)event.context())) {
-					//alredy present, discard the old one
 					foundPosition = i;
 					break;
 				}
@@ -216,7 +214,6 @@ public class WatchListener implements Runnable {
 								return FileVisitResult.CONTINUE;
 							}
 						});
-//						uploadService.uploadAsFolder(fullPath, localRootFolder, remoteFolder);
 					} catch (IOException e) {
 						logger.error("Exception", e);
 					}
@@ -254,7 +251,6 @@ public class WatchListener implements Runnable {
 											synchronizationService.getSynchronizedLocalRootFolderByRemoteFolder(remoteFolder),
 											"^" + relativeLocation);
 								}
-//								uploadService.deleteAsFolder(remoteFolder, );
 								logger.debug("[[DEBUG]] Remove folder {} from the folders tree");
 								if(directories.contains(fullLocation)) {
 									directories.remove(fullLocation);									
@@ -267,14 +263,14 @@ public class WatchListener implements Runnable {
 						logger.info("[[INFO]] Deleted folder was not in listening. Doing nothing...");
 					}
 				} else {
-					logger.debug("[[DEBUG]] DELETE event on file " + fullLocation);
+					logger.debug("[[DEBUG]] DELETE event on file {}", fullLocation);
 					if (!uploadService.delete(remoteFolder, fullLocation.replaceFirst(localRootFolder, ""))) {
 						logger.error("[[ERROR]] Error deleting file {} from S3", fullLocation);
 					}
 				}
 				break;
 			default:
-				logger.debug("[[DEBUG]] Unhandled event {} on file {}", event.kind().name(), fullLocation);
+				logger.debug("[[DEBUG]] Unhandled event {} on file {}", event.kind(), fullLocation);
 			}
 			logger.debug("[[DEBUG]] Finish serving event on {}", fullLocation);
 		} else {

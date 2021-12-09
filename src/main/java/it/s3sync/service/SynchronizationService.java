@@ -8,10 +8,10 @@ import java.nio.file.Paths;
 import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -50,8 +50,8 @@ public class SynchronizationService {
 	@Autowired
 	private UploadService uploadService;
 
-	private static volatile Map<String, String> synchronizedFolder = new HashMap<>();
-	private static volatile Map<String, List<Pattern>> exclusionPatterns = new HashMap<>();
+	private static volatile Map<String, String> synchronizedFolder = new ConcurrentHashMap<>();
+	private static volatile Map<String, List<Pattern>> exclusionPatterns = new ConcurrentHashMap<>();
 
 	private static final Logger logger = LoggerFactory.getLogger(SynchronizationService.class);
 
@@ -148,7 +148,7 @@ public class SynchronizationService {
 				logger.trace("[[TRACE]] Serving item {}", itemLocalFullLocation);
 				Path itemLocalFullPath = Paths.get(itemLocalFullLocation);
 				if (FileUtils.notMatchFilters(exclusionPatterns.get(localRootFolder), item.getOriginalName())) {
-					if (item.getDeleted()) {
+					if (item.getDeleted().booleanValue()) {
 						logger.debug("[[DEBUG]] Serving delete operation on {}", itemLocalFullLocation);
 						try {
 							if (Files.exists(itemLocalFullPath) && Files.isWritable(itemLocalFullPath)) {

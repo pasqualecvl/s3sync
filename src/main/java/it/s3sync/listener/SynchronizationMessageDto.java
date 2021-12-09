@@ -7,10 +7,10 @@ public class SynchronizationMessageDto implements Serializable {
 	private static final long serialVersionUID = 204252542632494654L;
 	
 	private String source;
-	public String remoteFolder;
-	public String file;
-	public S3Action s3Action;
-	public Long time = System.currentTimeMillis();
+	private String remoteFolder;
+	private String file;
+	private S3Action s3Action;
+	private Long time = System.currentTimeMillis();
 
 	public String getRemoteFolder() {
 		return remoteFolder;
