@@ -6,7 +6,7 @@ import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.json.JsonMapper;
 
-import it.s3sync.sync.EventData.AmqpEventData;
+import it.s3sync.sync.AmqpEventData;
 import it.s3sync.sync.SynchronizationThreadPool;
 
 @Service

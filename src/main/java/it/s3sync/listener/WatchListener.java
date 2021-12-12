@@ -27,6 +27,8 @@ import org.slf4j.LoggerFactory;
 import com.sun.nio.file.SensitivityWatchEventModifier;
 
 import it.s3sync.service.SynchronizationService;
+import it.s3sync.sync.FileSystemEventData;
+import it.s3sync.sync.SynchronizationThreadPool;
 import it.s3sync.utils.SpringContext;
 
 public class WatchListener implements Runnable {
@@ -82,7 +84,12 @@ public class WatchListener implements Runnable {
 									//TODO: caching events and serving them through fixed size thread pool
 									//   NOTE: look up for concurrent upload on the same file and kill it -> bind thread to file full path
 									//	 NOTE2: managing folder create requires full scan and synchronization (same as startup sync) because some files might have been created before the listener started
-									managingEvent(event, watchKey.watchable());
+									FileSystemEventData fsEvent = new FileSystemEventData();
+									fsEvent.setLocalRootFolder(localRootFolder);
+									fsEvent.setRemoteFolder(remoteFolder);
+									fsEvent.setWatchable(watchKey.watchable());
+									fsEvent.setWatchEvent(event);
+									SynchronizationThreadPool.enqueue(fsEvent);
 								} catch (Exception e) {
 									logger.error("[[ERROR]] Exception managing event {} on {}, proceed with next",
 											event.kind(), watchKey.watchable(), e);

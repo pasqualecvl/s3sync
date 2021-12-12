@@ -22,7 +22,7 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import it.s3sync.exception.PreventUploadForFolderException;
 import it.s3sync.model.Item;
 import it.s3sync.model.SharedData;
-import it.s3sync.sync.EventData.AmqpEventData;
+import it.s3sync.sync.AmqpEventData;
 import it.s3sync.sync.EventData.S3Action;
 import it.s3sync.utils.FileUtils;
 import it.s3sync.utils.GlobalPropertiesManager;
