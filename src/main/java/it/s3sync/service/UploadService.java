@@ -3,6 +3,7 @@ package it.s3sync.service;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,6 +34,7 @@ import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.CopyObjectRequest;
 import software.amazon.awssdk.services.s3.model.CopyObjectResponse;
+import software.amazon.awssdk.services.s3.model.CreateMultipartUploadRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectResponse;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
@@ -40,6 +42,7 @@ import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectResponse;
+import software.amazon.awssdk.services.s3.model.S3Response;
 
 /**
  * Service implementing methods to upload/download/delete files
@@ -61,6 +64,8 @@ public class UploadService {
 	@Qualifier("sqsJsonMapper")
 	private JsonMapper jsonMapper;
 
+	private static final long multipatUploadStartSize = (long)(5 * 1024 * 1024);
+	
 	private static final Logger logger = LoggerFactory.getLogger(UploadService.class);
 
 	public void upload(Path path, String relativePath, String remoteFolder, Item item, Long lastModified) {
@@ -76,10 +81,7 @@ public class UploadService {
 		logger.debug("Uploading {} to s3 folder {} with relative path {}", path, remoteFolder, relativePath);
 		try {
 			if (item == null || item.getDeleted() ||  FileUtils.checkForDifferentChecksum(item.getChecksum(), path)) {
-				PutObjectRequest objectRequest = PutObjectRequest.builder()
-						.bucket(GlobalPropertiesManager.getProperty("s3.bucket")).key(remoteFolder + relativePath)
-						.build();
-				PutObjectResponse response = s3Client.putObject(objectRequest, path);
+				S3Response response = uploadOrMultipart(remoteFolder + relativePath, path);
 				if (response.sdkHttpResponse().isSuccessful()) {
 					logger.debug("[[DEBUG]] Uploading {} to {} successfully", relativePath, remoteFolder);
 					boolean isCreate = false;
@@ -112,6 +114,25 @@ public class UploadService {
 		} catch (UncheckedIOException e) {
 			logger.error("[[ERROR]] Exception removing file {}", relativePath, e);
 		}
+	}
+
+	private S3Response uploadOrMultipart(String s3Key, Path path) {
+        long bytes;
+		try {
+			bytes = Files.size(path);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+        if(bytes > multipatUploadStartSize) {
+    		CreateMultipartUploadRequest upload = CreateMultipartUploadRequest.builder().build();
+        	
+        } else {
+    		PutObjectRequest objectRequest = PutObjectRequest.builder()
+    				.bucket(GlobalPropertiesManager.getProperty("s3.bucket")).key(s3Key)
+    				.build();
+    		return s3Client.putObject(objectRequest, path);        	
+        }
 	}
 
 	public void upload(Path path, String remoteFolder, String relativePath, Long lastModified) {
