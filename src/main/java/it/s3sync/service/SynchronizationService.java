@@ -49,12 +49,14 @@ public class SynchronizationService {
 
 	@Autowired
 	private UploadService uploadService;
-
+	
 	private static volatile Map<String, String> synchronizedFolder = new ConcurrentHashMap<>();
 	private static volatile Map<String, List<Pattern>> exclusionPatterns = new ConcurrentHashMap<>();
 
 	private static final Logger logger = LoggerFactory.getLogger(SynchronizationService.class);
 
+	
+	
 	@PostConstruct
 	private void synchronizeOnStartup() {
 		logger.info("Run startup synchronization. Lock listeners semaphore");
@@ -334,5 +336,4 @@ public class SynchronizationService {
 			synchronizedFolder.put(localPath, remotePath);
 		}
 	}
-
 }
