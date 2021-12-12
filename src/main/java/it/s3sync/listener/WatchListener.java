@@ -11,12 +11,9 @@ import java.nio.file.StandardWatchEventKinds;
 import java.nio.file.WatchEvent;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
-import java.nio.file.Watchable;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -72,57 +69,34 @@ public class WatchListener implements Runnable {
 			while (true) {
 				// Timeout needed because sometimes maps must be reloaded
 				WatchKey watchKey = watchService.poll(60, TimeUnit.SECONDS);
-				boolean solved = false;
-				do {
-					// Operation locked by batch processes (like startup synchonization, batch
-					// synchronization, etc)
-					if (WatchListeners.threadNotLocked()) {
-						if (watchKey != null) {
-							for (WatchEvent<?> event : skipCreateOnFolder(watchKey.pollEvents(), watchKey)) {
-								logger.debug("[[DEBUG]] Managing event {}", event);
-								try {
-									//TODO: caching events and serving them through fixed size thread pool
-									//   NOTE: look up for concurrent upload on the same file and kill it -> bind thread to file full path
-									//	 NOTE2: managing folder create requires full scan and synchronization (same as startup sync) because some files might have been created before the listener started
-									FileSystemEventData fsEvent = new FileSystemEventData();
-									fsEvent.setLocalRootFolder(localRootFolder);
-									fsEvent.setRemoteFolder(remoteFolder);
-									fsEvent.setWatchable(watchKey.watchable());
-									fsEvent.setWatchEvent(event);
-									SynchronizationThreadPool.enqueue(fsEvent);
-								} catch (Exception e) {
-									logger.error("[[ERROR]] Exception managing event {} on {}, proceed with next",
-											event.kind(), watchKey.watchable(), e);
-								}
-							}
-							watchKey.reset();
+				if (watchKey != null) {
+					for (WatchEvent<?> event : watchKey.pollEvents()) {
+						logger.debug("[[DEBUG]] Managing event {}", event);
+						try {
+							// TODO: caching events and serving them through fixed size thread pool
+							// NOTE: look up for concurrent upload on the same file and kill it -> bind
+							// thread to file full path
+							// NOTE2: managing folder create requires full scan and synchronization (same as
+							// startup sync) because some files might have been created before the listener
+							// started
+							FileSystemEventData fsEvent = new FileSystemEventData();
+							fsEvent.setLocalRootFolder(localRootFolder);
+							fsEvent.setRemoteFolder(remoteFolder);
+							fsEvent.setWatchable(watchKey.watchable());
+							fsEvent.setWatchEvent(event);
+							SynchronizationThreadPool.enqueue(fsEvent);
+						} catch (Exception e) {
+							logger.error("[[ERROR]] Exception managing event {} on {}, proceed with next", event.kind(),
+									watchKey.watchable(), e);
 						}
-						solved = true;
-					} else {
-						logger.debug("[[DEBUG]] Thread on {} currently locked by semaphore, wait 1000ms", localRootFolder);
-						Thread.sleep(1000);
 					}
-				} while(!solved);
+					watchKey.reset();
+				}
 			}
 		} catch (Exception e) {
 			throw new RuntimeException("[[ERROR]]Cannot start listening thread", e);
 		}
 	}
-
-	private List<WatchEvent<?>> skipCreateOnFolder(List<WatchEvent<?>> events, WatchKey watchKey) {
-		List<WatchEvent<?>> filteredEvents = new ArrayList<>();
-		for(int i = 0; i< events.size(); i++) {
-			if(events.get(i).kind().name().equals("EVENT_CREATE") && 
-					Files.isDirectory(Path.of(watchKey.watchable().toString() + events.get(i).context().toString()))) {
-				logger.trace("[[TRACE]] Discarding event on {} because it is a CRAETE on a folder (must do nothing)",
-						watchKey.watchable().toString() + events.get(i).context().toString());
-			} else {
-				filteredEvents.add(events.get(i));
-			}
-		}
-		return filteredEvents;
-	}
-	
 
 	public void addFolder(String fullLocation) {
 		Path path = Path.of(fullLocation);
@@ -144,7 +118,7 @@ public class WatchListener implements Runnable {
 	}
 
 	public void justRemoteSyncFolder(String fullLocation) {
-		if(watchKeys.containsKey(fullLocation)) {
+		if (watchKeys.containsKey(fullLocation)) {
 			if (directories.contains(fullLocation)) {
 				logger.debug("[[DEBUG]] DELETE event on folder {}", fullLocation);
 				if (watchKeys.containsKey(fullLocation)) {
@@ -158,16 +132,18 @@ public class WatchListener implements Runnable {
 				try {
 					String relativeLocation = fullLocation.replaceFirst(localRootFolder, "");
 					if (relativeLocation.isBlank()) {
-						SpringContext.getBean(SynchronizationService.class).removeSynchronizationFolder(
-								SpringContext.getBean(SynchronizationService.class).getSynchronizedLocalRootFolderByRemoteFolder(remoteFolder));
+						SpringContext.getBean(SynchronizationService.class)
+								.removeSynchronizationFolder(SpringContext.getBean(SynchronizationService.class)
+										.getSynchronizedLocalRootFolderByRemoteFolder(remoteFolder));
 					} else {
 						SpringContext.getBean(SynchronizationService.class).addSynchronizationExclusionPattern(
-								SpringContext.getBean(SynchronizationService.class).getSynchronizedLocalRootFolderByRemoteFolder(remoteFolder),
+								SpringContext.getBean(SynchronizationService.class)
+										.getSynchronizedLocalRootFolderByRemoteFolder(remoteFolder),
 								"^" + relativeLocation);
 					}
 					logger.debug("[[DEBUG]] Remove folder {} from the folders tree");
-					if(directories.contains(fullLocation)) {
-						directories.remove(fullLocation);									
+					if (directories.contains(fullLocation)) {
+						directories.remove(fullLocation);
 					}
 				} catch (Exception e) {
 					logger.error("Exception removing file {}", fullLocation, e);
@@ -178,7 +154,7 @@ public class WatchListener implements Runnable {
 		}
 
 	}
-	
+
 	public void removeFolder(String fullLocation) {
 		synchronized (watchKeys) {
 			watchKeys.remove(fullLocation);

@@ -34,54 +34,59 @@ public class SynchornizationThread extends Thread {
 	private SynchronizationService synchronizationService;
 	private UploadService uploadService;
 	private MongoOperations mongoOperations;
-	
+
 	private static final Logger logger = LoggerFactory.getLogger(SynchornizationThread.class);
-	
+
 	public SynchornizationThread(EventData eventData) {
 		this.eventData = eventData;
-		// SAFE OP -> It is impossible for a thread like this to start before spring context is fully loaded 
+		// SAFE OP -> It is impossible for a thread like this to start before spring
+		// context is fully loaded
 		this.synchronizationService = SpringContext.getBean(SynchronizationService.class);
 		this.uploadService = SpringContext.getBean(UploadService.class);
 		this.mongoOperations = SpringContext.getBean(MongoOperations.class);
 	}
-	
+
 	@Override
 	public void run() {
-		if(EventSource.AMQP.equals(eventData.getEventSource())) {
+		if (EventSource.AMQP.equals(eventData.getEventSource())) {
 			rusAsAmqpEvent(eventData);
 		} else {
 			runAsFilesystemEvent(eventData);
 		}
+		try {
+			SynchronizationThreadPool.serveNext(this);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
 	}
 
 	private void runAsFilesystemEvent(EventData eventData) {
-		if(!(eventData instanceof FileSystemEventData)) {
-			logger.info("[[INFO]] Trying serving event with kind {} from filesystem event manager", eventData.getEventSource());
+		if (!(eventData instanceof FileSystemEventData)) {
+			logger.info("[[INFO]] Trying serving event with kind {} from filesystem event manager",
+					eventData.getEventSource());
 			return;
-		}		
-		FileSystemEventData castedEventData = (FileSystemEventData)eventData;
-		
+		}
+		FileSystemEventData castedEventData = (FileSystemEventData) eventData;
+
 		Watchable watchable = castedEventData.getWatchable();
 		WatchEvent<?> event = castedEventData.getWatchEvent();
 		String localRootFolder = castedEventData.getLocalRootFolder();
 		String remoteFolder = castedEventData.getRemoteFolder();
-		
-		
+
 		String listenerPath = watchable.toString();
 		String resourceName = event.context().toString();
 		String fullLocation = listenerPath + "/" + resourceName;
 		Path fullPath = Path.of(fullLocation);
 
 		boolean workAsDirectory = Files.isDirectory(fullPath);
-		
+
 		Operation operation = new Operation();
-		operation.setS3Action("ENTRY_CREATE".equals(event.kind().name()) ? 
-				S3Action.CREATE : "ENTRY_MODIFY".equals(event.kind().name()) ? 
-						S3Action.MODIFY : S3Action.DELETE);
-		if(workAsDirectory) {
+		operation.setS3Action("ENTRY_CREATE".equals(event.kind().name()) ? S3Action.CREATE
+				: "ENTRY_MODIFY".equals(event.kind().name()) ? S3Action.MODIFY : S3Action.DELETE);
+		if (workAsDirectory) {
 			operation.setOnFile(fullLocation);
 		} else {
-			operation.setOnFile(fullLocation.replaceFirst(localRootFolder, ""));			
+			operation.setOnFile(fullLocation.replaceFirst(localRootFolder, ""));
 		}
 		if (FileUtils.notMatchFilters(synchronizationService.getExclusionPattern(localRootFolder), fullLocation)) {
 			switch (event.kind().name()) {
@@ -115,7 +120,7 @@ public class SynchornizationThread extends Thread {
 				break;
 			case "ENTRY_DELETE":
 				logger.debug("[[DEBUG]] Managing event DELETE on file {}", fullLocation);
-				if(workAsDirectory) {
+				if (workAsDirectory) {
 					WatchListeners.removeFolder(localRootFolder, fullLocation);
 				} else {
 					logger.debug("[[DEBUG]] DELETE event on file {}", fullLocation);
@@ -134,68 +139,61 @@ public class SynchornizationThread extends Thread {
 	}
 
 	private void rusAsAmqpEvent(EventData eventData) {
-		if(!(eventData instanceof AmqpEventData)) {
-			logger.info("[[INFO]] Trying serving event with kind {} from amqp event manager", eventData.getEventSource());
+		if (!(eventData instanceof AmqpEventData)) {
+			logger.info("[[INFO]] Trying serving event with kind {} from amqp event manager",
+					eventData.getEventSource());
 			return;
 		}
-		AmqpEventData localEvent = (AmqpEventData)eventData;
-		
-		WatchListeners.lockSemaphore();
-		logger.info("Locking WatchListeners");
-		try {
-			if (!localEvent.getSource().equals(UserSpecificPropertiesManager.getConfiguration().getAlias())) {
-				String localFolder = synchronizationService.getSynchronizedLocalRootFolderByRemoteFolder(eventData.getRemoteFolder());
-				if (localFolder != null) {
-					logger.info("Serving action: {}", eventData.toString());
-					if (S3Action.CREATE.equals(localEvent.getS3Action()) || S3Action.MODIFY.equals(localEvent.getS3Action())) {
-						Item item = mongoOperations.findOne(
-								new Query(Criteria.where("ownedByFolder").is(eventData.getRemoteFolder()).and("originalName").is(localEvent.getFile())),
-								Item.class);
-						List<String> folders = uploadService.getOrUpdate(localFolder + localEvent.getFile(), item);
-						if (!folders.isEmpty()) {
-							for (String folder : folders) {
-								// if a new folder will be created, current watchers will throw an event on the
-								// parent folder of this event
-								if (!((WatchListener) WatchListeners.getThread(localFolder).getR())
-										.existsWatchKey(folder)) {
-									// start as separate thread to prevent lock (the thread is probably waiting for
-									// watchService.poll operation
-									new Thread(new AddNewWatchKey(localFolder, folder)).start();
-								}
-								Operation operation = new Operation();
-								operation.setOnFile(folder);
-								operation.setS3Action(localEvent.getS3Action());
-							}
-						}						
-						Operation operation = new Operation();
-						operation.setOnFile(localFolder + localEvent.getFile());
-						operation.setS3Action(localEvent.getS3Action());
-					} else if (S3Action.DELETE.equals(localEvent.getS3Action())) {
-						long localFileLastModified = Path.of(localFolder + localEvent.getFile()).toFile().lastModified();
-						if (localFileLastModified <= localEvent.getTime()) {
-							List<String> toDelete = FileUtils.toDeleteFileAndEmptyTree(localFolder + localEvent.getFile());
-							for (String s : toDelete) {
+		AmqpEventData localEvent = (AmqpEventData) eventData;
+
+		if (!localEvent.getSource().equals(UserSpecificPropertiesManager.getConfiguration().getAlias())) {
+			String localFolder = synchronizationService
+					.getSynchronizedLocalRootFolderByRemoteFolder(eventData.getRemoteFolder());
+			if (localFolder != null) {
+				logger.info("Serving action: {}", eventData.toString());
+				if (S3Action.CREATE.equals(localEvent.getS3Action())
+						|| S3Action.MODIFY.equals(localEvent.getS3Action())) {
+					Item item = mongoOperations.findOne(new Query(Criteria.where("ownedByFolder")
+							.is(eventData.getRemoteFolder()).and("originalName").is(localEvent.getFile())), Item.class);
+					List<String> folders = uploadService.getOrUpdate(localFolder + localEvent.getFile(), item);
+					if (!folders.isEmpty()) {
+						for (String folder : folders) {
+							// if a new folder will be created, current watchers will throw an event on the
+							// parent folder of this event
+							if (!((WatchListener) WatchListeners.getThread(localFolder).getR())
+									.existsWatchKey(folder)) {
 								// start as separate thread to prevent lock (the thread is probably waiting for
 								// watchService.poll operation
-								new Thread(new RemoveWatchKey(localFolder, s)).start();
+								new Thread(new AddNewWatchKey(localFolder, folder)).start();
 							}
-						} else {
-							logger.info("Local file is newer than the remote one: {} -> {}", localFileLastModified,
-									localEvent.getTime());
+							Operation operation = new Operation();
+							operation.setOnFile(folder);
+							operation.setS3Action(localEvent.getS3Action());
 						}
 					}
+					Operation operation = new Operation();
+					operation.setOnFile(localFolder + localEvent.getFile());
+					operation.setS3Action(localEvent.getS3Action());
+				} else if (S3Action.DELETE.equals(localEvent.getS3Action())) {
+					long localFileLastModified = Path.of(localFolder + localEvent.getFile()).toFile().lastModified();
+					if (localFileLastModified <= localEvent.getTime()) {
+						List<String> toDelete = FileUtils.toDeleteFileAndEmptyTree(localFolder + localEvent.getFile());
+						for (String s : toDelete) {
+							// start as separate thread to prevent lock (the thread is probably waiting for
+							// watchService.poll operation
+							new Thread(new RemoveWatchKey(localFolder, s)).start();
+						}
+					} else {
+						logger.info("Local file is newer than the remote one: {} -> {}", localFileLastModified,
+								localEvent.getTime());
+					}
 				}
-			} else {
-				logger.info("Consuming AMQP message made by this client -> discarded");
 			}
-		} finally {
-			logger.info("Release semaphore");
-			WatchListeners.releaseSemaphore();
+		} else {
+			logger.info("Consuming AMQP message made by this client -> discarded");
 		}
-		
 	}
-	
-	
+
 	protected class AddNewWatchKey implements Runnable {
 
 		private String folder;
