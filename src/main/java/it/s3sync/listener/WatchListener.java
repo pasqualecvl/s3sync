@@ -78,7 +78,7 @@ public class WatchListener implements Runnable {
 					// synchronization, etc)
 					if (WatchListeners.threadNotLocked()) {
 						if (watchKey != null) {
-							for (WatchEvent<?> event : sanitize(watchKey.pollEvents(), watchKey)) {
+							for (WatchEvent<?> event : skipCreateOnFolder(watchKey.pollEvents(), watchKey)) {
 								logger.debug("[[DEBUG]] Managing event {}", event);
 								try {
 									//TODO: caching events and serving them through fixed size thread pool
@@ -109,10 +109,6 @@ public class WatchListener implements Runnable {
 		}
 	}
 
-	List<WatchEvent<?>> sanitize(List<WatchEvent<?>> events, WatchKey watchKey) {
-		return skipCreateOnFolder(removeDeleteOverCreation(deduplicateEvent(events)), watchKey);
-	}
-	
 	private List<WatchEvent<?>> skipCreateOnFolder(List<WatchEvent<?>> events, WatchKey watchKey) {
 		List<WatchEvent<?>> filteredEvents = new ArrayList<>();
 		for(int i = 0; i< events.size(); i++) {
@@ -127,55 +123,6 @@ public class WatchListener implements Runnable {
 		return filteredEvents;
 	}
 	
-	private List<WatchEvent<?>> removeDeleteOverCreation(List<WatchEvent<?>> events) {
-		List<WatchEvent<?>> filteredEvents = new ArrayList<>();
-		List<Integer> blockList = new ArrayList<>();
-		for(int i = 0; i< events.size(); i++) {
-			if(events.get(i).kind().name().equals("EVENT_CREATE") || events.get(i).kind().name().equals("EVENT_MODIFY")) {
-				int foundPosition = -1;
-				for(int j = i + 1; j < events.size(); j++) {
-					if(events.get(j).kind().name().equals("EVENT_DELETE") && 
-							(((Path)events.get(j).context()).equals(events.get(j).context()))
-									&& !blockList.contains(j)) {
-						foundPosition = j;
-						blockList.add(j);
-						break;
-					}
-				}
-				if(foundPosition == -1) {
-					filteredEvents.add(events.get(i));
-				}
-			} else if(!blockList.contains(i)) {
-				filteredEvents.add(events.get(i));
-			}
-		}
-		return filteredEvents;
-	}
-
-	private List<WatchEvent<?>> deduplicateEvent(List<WatchEvent<?>> events) {
-		List<WatchEvent<?>> filteredEvents = new ArrayList<>();
-		for(WatchEvent<?> event : events) {
-			int foundPosition = -1;
-			for(int i = 0; i < filteredEvents.size(); i++) {
-				if(filteredEvents.get(i).kind().name().equals(event.kind().name())
-						&& ((Path)filteredEvents.get(i).context()).equals((Path)event.context())) {
-					foundPosition = i;
-					break;
-				}
- 			}
-			
-			if(foundPosition > -1) {
-				WatchEvent<?> lastEvent = filteredEvents.get(filteredEvents.size());
-				filteredEvents.remove(filteredEvents.size());
-				filteredEvents.add(foundPosition, lastEvent);
-			}
-			filteredEvents.add(event);
-		}
-		return filteredEvents;
-	}
-
-	private void managingEvent(WatchEvent<?> event, Watchable watchable) {
-	}
 
 	public void addFolder(String fullLocation) {
 		Path path = Path.of(fullLocation);
