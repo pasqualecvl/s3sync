@@ -69,7 +69,7 @@ public class ManageFolderService {
 
 	private void addRemoteFolder(String remotePath) {
 		List<SharedData> data = mongoOperations.findAll(SharedData.class);
-		if(data.size() == 0) {
+		if(data.isEmpty()) {
 			logger.debug("[[DEBUG]] Folder {} not found in SharedDatas because SharedData is currently null", remotePath);
 			SharedData item = new SharedData();
 			item.setRemoteFolders(Arrays.asList(remotePath));
@@ -112,7 +112,7 @@ public class ManageFolderService {
 			responseItem.setLocalFolder(folder.getLocalPath());
 			responseItem.setRemoteFolder(folder.getRemotePath());
 			responseItem.setExclusionPatterns(folder.getExclusionPattern());
-			logger.debug("[[DEBUG]] Adding folder to response: {}", responseItem.toString());
+			logger.debug("[[DEBUG]] Adding folder to response: {}", responseItem);
 			responseList.add(responseItem);
 		}
 		response.setList(responseList);
@@ -164,7 +164,7 @@ public class ManageFolderService {
 		}		
 	}
 
-	public ListRemoteFolderResponse listRemoteFolders(Integer page, Integer pageSize) {
+	public ListRemoteFolderResponse listRemoteFolders() {
 		ListRemoteFolderResponse response = new ListRemoteFolderResponse();
 		List<SharedData> data = mongoOperations.findAll(SharedData.class);
 		if(data.size() != 1) {

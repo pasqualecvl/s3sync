@@ -31,8 +31,8 @@ public class ManageFolderController {
 	private ManageFolderService manageFolderService;
 
 	@GetMapping(value = "/api/folder/list_remote")
-	public ListRemoteFolderResponse listRemoteFolder(@RequestParam Integer page, @RequestParam Integer pageSize) {
-		return manageFolderService.listRemoteFolders(page, pageSize);
+	public ListRemoteFolderResponse listRemoteFolder() {
+		return manageFolderService.listRemoteFolders();
 	}
 
 	@PostMapping(value = "/api/folder/add")

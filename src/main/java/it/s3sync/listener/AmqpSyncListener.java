@@ -41,24 +41,20 @@ public class AmqpSyncListener {
 	private MongoOperations mongoOperations;
 
 	public void receiveSyncMessage(SynchronizationMessageDto dto) {
+		// lock event on file
 		WatchListeners.lockSemaphore();
 		logger.info("Locking WatchListeners");
 		try {
 			if (!dto.getSource().equals(UserSpecificPropertiesManager.getConfiguration().getAlias())) {
 				String localFolder = synchronizationService.getSynchronizedLocalRootFolderByRemoteFolder(dto.getRemoteFolder());
 				if (localFolder != null) {
-					// lock event on file
-					// FIXME: since watchKey will be create by a thread AFTER the file is
-					// downloaded, this could be useless
-					// TODO: check and eventually remove
-					// WatchListeners.putChangesWhileLocked(localFolder, dto.getFile());
-					logger.info("Serving action: " + dto.toString());
+					logger.info("Serving action: {}", dto.toString());
 					if (S3Action.CREATE.equals(dto.getS3Action()) || S3Action.MODIFY.equals(dto.getS3Action())) {
 						Item item = mongoOperations.findOne(
 								new Query(Criteria.where("ownedByFolder").is(dto.getRemoteFolder()).and("originalName").is(dto.getFile())),
 								Item.class);
 						List<String> folders = uploadService.getOrUpdate(localFolder + dto.getFile(), item);
-						if (folders.size() > 0) {
+						if (!folders.isEmpty()) {
 							for (String folder : folders) {
 								// if a new folder will be created, current watchers will throw an event on the
 								// parent folder of this event
