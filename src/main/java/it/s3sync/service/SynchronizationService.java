@@ -8,10 +8,10 @@ import java.nio.file.Paths;
 import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -50,44 +50,37 @@ public class SynchronizationService {
 	@Autowired
 	private UploadService uploadService;
 
-	private static volatile Map<String, String> synchronizedFolder = new HashMap<>();
-	private static volatile Map<String, List<Pattern>> exclusionPatterns = new HashMap<>();
+	private static volatile Map<String, String> synchronizedFolder = new ConcurrentHashMap<>();
+	private static volatile Map<String, List<Pattern>> exclusionPatterns = new ConcurrentHashMap<>();
 
 	private static final Logger logger = LoggerFactory.getLogger(SynchronizationService.class);
 
 	@PostConstruct
 	private void synchronizeOnStartup() {
 		logger.info("Run startup synchronization. Lock listeners semaphore");
-		WatchListeners.lockSemaphore();
-		try {
-			AttachedClient client = UserSpecificPropertiesManager.getConfiguration();
-			// fast fill synchronizedFolder map
-			client.getSyncFolder().forEach(folder -> {
-				logger.debug("[[DEBUG]] Add {} -> {} to synchronizationFolders map", folder.getLocalPath(),
-						folder.getRemotePath());
-				synchronized (synchronizedFolder) {
-					synchronizedFolder.put(folder.getLocalPath(), folder.getRemotePath());
-				}
-				synchronized (exclusionPatterns) {
-					exclusionPatterns.put(folder.getLocalPath(), folder.getExclusionPattern() != null
-							? folder.getExclusionPattern().stream().map(pattern -> {
-								logger.debug("[[DEBUG]] Add exclusion pattern {} to {} -> {}", pattern,
-										folder.getLocalPath(), folder.getRemotePath());
-								return Pattern.compile(pattern);
-							}).collect(Collectors.toList())
-							: new ArrayList<>());
-				}
-			});
-			if (client.getClientConfiguration().isRunSynchronizationOnStartup()) {
-				client.getSyncFolder().forEach(folder -> {
-					synchronize(folder.getRemotePath(), folder.getLocalPath());
-				});
-			} else {
-				logger.debug("[[DEBUG]] Synchronization on startup is disabled.");
+		AttachedClient client = UserSpecificPropertiesManager.getConfiguration();
+		// fast fill synchronizedFolder map
+		client.getSyncFolder().forEach(folder -> {
+			logger.debug("[[DEBUG]] Add {} -> {} to synchronizationFolders map", folder.getLocalPath(),
+					folder.getRemotePath());
+			synchronized (synchronizedFolder) {
+				synchronizedFolder.put(folder.getLocalPath(), folder.getRemotePath());
 			}
-		} finally {
-			logger.info("Finished. Release lock");
-			WatchListeners.releaseSemaphore();
+			synchronized (exclusionPatterns) {
+				exclusionPatterns.put(folder.getLocalPath(),
+						folder.getExclusionPattern() != null ? folder.getExclusionPattern().stream().map(pattern -> {
+							logger.debug("[[DEBUG]] Add exclusion pattern {} to {} -> {}", pattern,
+									folder.getLocalPath(), folder.getRemotePath());
+							return Pattern.compile(pattern);
+						}).collect(Collectors.toList()) : new ArrayList<>());
+			}
+		});
+		if (client.getClientConfiguration().isRunSynchronizationOnStartup()) {
+			client.getSyncFolder().forEach(folder -> {
+				synchronize(folder.getRemotePath(), folder.getLocalPath());
+			});
+		} else {
+			logger.debug("[[DEBUG]] Synchronization on startup is disabled.");
 		}
 	}
 
@@ -111,25 +104,27 @@ public class SynchronizationService {
 		Map<String, Item> mapItems = items.stream().collect(Collectors.toMap(Item::getOriginalName, Item::get));
 		Files.walk(Paths.get(localRootFolder)).forEach(path -> {
 			File file = path.toFile();
-			if (!file.isDirectory() && file.canRead() && FileUtils.notMatchFilters(exclusionPatterns.get(localRootFolder),
-					path.toString().replaceFirst(localRootFolder, ""))) {
+			if (!file.isDirectory() && file.canRead() && FileUtils.notMatchFilters(
+					exclusionPatterns.get(localRootFolder), path.toString().replaceFirst(localRootFolder, ""))) {
 				String relativePath = file.getAbsolutePath().replaceFirst(localRootFolder, "");
 				if (!mapItems.containsKey(relativePath) || (mapItems.containsKey(relativePath)
 						&& mapItems.get(relativePath).getLastUpdate() < file.lastModified())) {
 					logger.trace("[[TRACE]] Uploading file {}", path.toString());
 					try {
 						uploadService.upload(path, relativePath, remoteFolder, mapItems.get(relativePath),
-							Files.getLastModifiedTime(path).toMillis());
+								Files.getLastModifiedTime(path).toMillis());
 					} catch (IOException e) {
 						logger.error("[[ERROR]] Cannot upload file {}", path.toString(), e);
 					} catch (PreventUploadForFolderException e) {
 						logger.error("[[ERROR]] Trying to upload folder {}, prevented by default", path.toString());
 					}
 				} else {
-					logger.debug("[[DEBUG]] {} will not be uploaded because it is oldest than the remote one",path.toString());
+					logger.debug("[[DEBUG]] {} will not be uploaded because it is oldest than the remote one",
+							path.toString());
 				}
 			} else {
-				logger.debug("[[DEBUG]] {} will not be uploaded because missing prerequisite (e.g. exclusion pattern)", path.toString());
+				logger.debug("[[DEBUG]] {} will not be uploaded because missing prerequisite (e.g. exclusion pattern)",
+						path.toString());
 			}
 		});
 	}
@@ -142,20 +137,21 @@ public class SynchronizationService {
 			if (!localRootFolder.endsWith("/") && !item.getOriginalName().startsWith("/")) {
 				localRootFolder = localRootFolder + "/";
 			}
-			if(FileUtils.notMatchFilters(exclusionPatterns.get(localRootFolder),
-					item.getOriginalName())) {
+			if (FileUtils.notMatchFilters(exclusionPatterns.get(localRootFolder), item.getOriginalName())) {
 				String itemLocalFullLocation = localRootFolder + item.getOriginalName();
 				logger.trace("[[TRACE]] Serving item {}", itemLocalFullLocation);
 				Path itemLocalFullPath = Paths.get(itemLocalFullLocation);
 				if (FileUtils.notMatchFilters(exclusionPatterns.get(localRootFolder), item.getOriginalName())) {
-					if (item.getDeleted()) {
+					if (item.getDeleted().booleanValue()) {
 						logger.debug("[[DEBUG]] Serving delete operation on {}", itemLocalFullLocation);
 						try {
 							if (Files.exists(itemLocalFullPath) && Files.isWritable(itemLocalFullPath)) {
 								logger.trace("[[TRACE]] Deleting file {}", itemLocalFullLocation);
 								Files.delete(itemLocalFullPath);
 							} else {
-								logger.info("[[INFO]] File {} cannot be deleted because it not exists or is not writable", itemLocalFullLocation);
+								logger.info(
+										"[[INFO]] File {} cannot be deleted because it not exists or is not writable",
+										itemLocalFullLocation);
 							}
 						} catch (IOException e) {
 							logger.error("Exception", e);
@@ -164,9 +160,12 @@ public class SynchronizationService {
 						if (item.getUploadedBy().equals(UserSpecificPropertiesManager.getConfiguration().getAlias())) {
 							// deleted items -> uploaded by current user but not found on local machine
 							if (!itemLocalFullPath.toFile().exists()) {
-								logger.debug("[[DEBUG]] Deleting item {} uploaded by the current user which not exists on local filesystem", itemLocalFullLocation);
+								logger.debug(
+										"[[DEBUG]] Deleting item {} uploaded by the current user which not exists on local filesystem",
+										itemLocalFullLocation);
 								if (!uploadService.delete(remoteFolder, item.getOriginalName())) {
-									logger.error("[[ERROR]] Error deleting s3 file {}/{}", remoteFolder, item.getOriginalName());
+									logger.error("[[ERROR]] Error deleting s3 file {}/{}", remoteFolder,
+											item.getOriginalName());
 								}
 							}
 							continue;
@@ -174,24 +173,28 @@ public class SynchronizationService {
 						// check for file exists
 						if (Files.exists(itemLocalFullPath)) {
 							// check for obsolete file
-							if (itemLocalFullPath.toFile().lastModified() < item.getLastUpdate() &&
-									FileUtils.checkForDifferentChecksum(item.getChecksum(), itemLocalFullPath)) {
+							if (itemLocalFullPath.toFile().lastModified() < item.getLastUpdate()
+									&& FileUtils.checkForDifferentChecksum(item.getChecksum(), itemLocalFullPath)) {
 								logger.debug("[[DEBUG]] File {} is out to date, updating...", itemLocalFullLocation);
 								// file is obsolete, go for update
 								uploadService.getOrUpdate(itemLocalFullLocation, item);
 								// update created file last modified to prevent synchronization loop
 								try {
-									logger.debug("[[DEBUG]] Setting file {} last modified same as the remote one: {}", itemLocalFullLocation, item.getLastUpdate());
-									Files.setLastModifiedTime(itemLocalFullPath, FileTime.fromMillis(item.getLastUpdate()));
+									logger.debug("[[DEBUG]] Setting file {} last modified same as the remote one: {}",
+											itemLocalFullLocation, item.getLastUpdate());
+									Files.setLastModifiedTime(itemLocalFullPath,
+											FileTime.fromMillis(item.getLastUpdate()));
 								} catch (IOException e) {
 									logger.error("Exception", e);
 								}
 							}
 						} else {
-							logger.debug("File {}/{} not found in the local folder {}", remoteFolder, item.getOriginalName(), localRootFolder);
+							logger.debug("File {}/{} not found in the local folder {}", remoteFolder,
+									item.getOriginalName(), localRootFolder);
 							uploadService.getOrUpdate(itemLocalFullLocation, item);
 							try {
-								logger.debug("[[DEBUG]] Setting file {} last modified same as the remote one: {}", itemLocalFullLocation, item.getLastUpdate());
+								logger.debug("[[DEBUG]] Setting file {} last modified same as the remote one: {}",
+										itemLocalFullLocation, item.getLastUpdate());
 								Files.setLastModifiedTime(itemLocalFullPath, FileTime.fromMillis(item.getLastUpdate()));
 							} catch (IOException e) {
 								logger.error("Exception", e);
@@ -200,7 +203,7 @@ public class SynchronizationService {
 					}
 				} else {
 					logger.debug("[[DEBUG]] File excluded by filter {}", itemLocalFullLocation);
-				}				
+				}
 			} else {
 				logger.info("[[INFO]] File {} not managed because it is excluded by filters", item.getOriginalName());
 			}
@@ -208,7 +211,7 @@ public class SynchronizationService {
 	}
 
 	public void removeSynchronizationFolder(String localRootFolder) {
-		if(localRootFolder == null) {
+		if (localRootFolder == null) {
 			return;
 		}
 		synchronized (synchronizedFolder) {
@@ -247,7 +250,7 @@ public class SynchronizationService {
 		List<String> toReturn = new ArrayList<>();
 		List<Pattern> patterns = exclusionPatterns.get(localFolder);
 		boolean present = false;
-		if(patterns == null) {
+		if (patterns == null) {
 			patterns = Collections.synchronizedList(new ArrayList<>());
 			exclusionPatterns.put(localFolder, patterns);
 		}
@@ -334,5 +337,4 @@ public class SynchronizationService {
 			synchronizedFolder.put(localPath, remotePath);
 		}
 	}
-
 }

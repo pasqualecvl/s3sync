@@ -3,6 +3,7 @@ package it.s3sync.service;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,10 +21,10 @@ import org.springframework.stereotype.Service;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 
 import it.s3sync.exception.PreventUploadForFolderException;
-import it.s3sync.listener.SynchronizationMessageDto;
-import it.s3sync.listener.SynchronizationMessageDto.S3Action;
 import it.s3sync.model.Item;
 import it.s3sync.model.SharedData;
+import it.s3sync.sync.AmqpEventData;
+import it.s3sync.sync.EventData.S3Action;
 import it.s3sync.utils.FileUtils;
 import it.s3sync.utils.GlobalPropertiesManager;
 import it.s3sync.utils.UserSpecificPropertiesManager;
@@ -33,6 +34,7 @@ import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.CopyObjectRequest;
 import software.amazon.awssdk.services.s3.model.CopyObjectResponse;
+import software.amazon.awssdk.services.s3.model.CreateMultipartUploadRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectResponse;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
@@ -40,6 +42,7 @@ import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectResponse;
+import software.amazon.awssdk.services.s3.model.S3Response;
 
 /**
  * Service implementing methods to upload/download/delete files
@@ -56,14 +59,13 @@ public class UploadService {
 
 	@Autowired
 	private AmqpTemplate amqpTemplate;
-
-//	@Autowired
-//	private SynchronizationService synchronizationService;
-
+	
 	@Autowired
 	@Qualifier("sqsJsonMapper")
 	private JsonMapper jsonMapper;
 
+	private static final long multipatUploadStartSize = (long)(5 * 1024 * 1024);
+	
 	private static final Logger logger = LoggerFactory.getLogger(UploadService.class);
 
 	public void upload(Path path, String relativePath, String remoteFolder, Item item, Long lastModified) {
@@ -79,10 +81,7 @@ public class UploadService {
 		logger.debug("Uploading {} to s3 folder {} with relative path {}", path, remoteFolder, relativePath);
 		try {
 			if (item == null || item.getDeleted() ||  FileUtils.checkForDifferentChecksum(item.getChecksum(), path)) {
-				PutObjectRequest objectRequest = PutObjectRequest.builder()
-						.bucket(GlobalPropertiesManager.getProperty("s3.bucket")).key(remoteFolder + relativePath)
-						.build();
-				PutObjectResponse response = s3Client.putObject(objectRequest, path);
+				S3Response response = uploadOrMultipart(remoteFolder + relativePath, path);
 				if (response.sdkHttpResponse().isSuccessful()) {
 					logger.debug("[[DEBUG]] Uploading {} to {} successfully", relativePath, remoteFolder);
 					boolean isCreate = false;
@@ -101,7 +100,7 @@ public class UploadService {
 					item.setUploadedBy(UserSpecificPropertiesManager.getConfiguration().getAlias());
 					logger.trace("[[TRACE]] Writing item on mongo: {}", item);
 					mongoOperations.save(item);
-					SynchronizationMessageDto dto = new SynchronizationMessageDto();
+					AmqpEventData dto = new AmqpEventData();
 					dto.setFile(relativePath);
 					dto.setRemoteFolder(remoteFolder);
 					dto.setSource(UserSpecificPropertiesManager.getConfiguration().getAlias());
@@ -115,6 +114,12 @@ public class UploadService {
 		} catch (UncheckedIOException e) {
 			logger.error("[[ERROR]] Exception removing file {}", relativePath, e);
 		}
+	}
+
+	private S3Response uploadOrMultipart(String s3Key, Path path) {
+		PutObjectRequest objectRequest = PutObjectRequest.builder()
+				.bucket(GlobalPropertiesManager.getProperty("s3.bucket")).key(s3Key).build();
+		return s3Client.putObject(objectRequest, path);
 	}
 
 	public void upload(Path path, String remoteFolder, String relativePath, Long lastModified) {
@@ -201,7 +206,7 @@ public class UploadService {
 					item.setLastUpdate(System.currentTimeMillis());
 					mongoOperations.save(item);
 				}
-				SynchronizationMessageDto dto = new SynchronizationMessageDto();
+				AmqpEventData dto = new AmqpEventData();
 				dto.setFile(relativePath);
 				dto.setRemoteFolder(remoteFolder);
 				dto.setS3Action(S3Action.DELETE);
@@ -219,114 +224,6 @@ public class UploadService {
 			return false;
 		}
 	}
-
-/*	public void deleteAsFolder(String remoteFolder, String relativeLocation) {
-		logger.debug("[[DEBUG]] Deleting localFolder {} from remote {}", relativeLocation, remoteFolder);
-		AttachedClient currentUser = UserSpecificPropertiesManager.getConfiguration();
-
-		// if recursive removal allowed, delete any items in folder locally and remote
-		if (currentUser.getClientConfiguration().isPreventFolderRecursiveRemoval()) {
-			logger.debug("[[DEBUG]] Client set recursive folder removal to disable."
-					+ "Add exclusion pattern for the folder, but doesn't remove it from remote.");
-			if (relativeLocation.isBlank()) {
-				// FIXME: This can't happen because top level folder has no listeners
-				// deleting /folder/to/sync which has a listener should throw an event on
-				// /folder/to
-				// which has no listener
-				logger.warn(
-						"[[WARN]] Found event on localRootFolder. This is managed, but read and edit the FIXME please");
-				// event on localRootFolder
-				synchronizationService.removeSynchronizationFolder(
-						synchronizationService.getSynchronizedLocalRootFolderByRemoteFolder(remoteFolder));
-				removeRemoteFolder(remoteFolder);
-			} else {
-				logger.debug("[[DEBUG]] Add exclusion pattern {} to remote folder {}", "^" + relativeLocation,
-						remoteFolder);
-				synchronizationService.addSynchronizationExclusionPattern(
-						synchronizationService.getSynchronizedLocalRootFolderByRemoteFolder(remoteFolder),
-						"^" + relativeLocation);
-			}
-		} else {
-			if (relativeLocation.isBlank()) {
-				// localRootFolder -> pick all items in folder
-				// FIXME: This can't happen because top level folder has no listeners
-				// deleting /folder/to/sync which has a listener should throw an event on
-				// /folder/to
-				// which has no listener
-				logger.warn(
-						"[[WARN]] Found event on localRootFolder. This is managed, but read and edit the FIXME please");
-				List<Item> toDelete = mongoOperations.find(new Query(Criteria.where("ownedByFolder").is(remoteFolder)),
-						Item.class);
-				toDelete.forEach(item -> {
-					if (!delete(item.getOwnedByFolder(), item.getOriginalName())) {
-						logger.error("Error deleting S3 file");
-					}
-				});
-			} else {
-				// subfolder -> filter filename by regexp
-				List<Item> toDelete = mongoOperations.find(new Query(Criteria.where("ownedByFolder").is(remoteFolder)
-						.and("deleted").is(false).and("originalName").regex("^" + relativeLocation + "/")), Item.class);
-				logger.debug("[[DEBUG]] Found {}# files to delete filtering by regexp {} on remote folder {}",
-						toDelete.size(), relativeLocation + "/", remoteFolder);
-				toDelete.forEach(item -> {
-					if (!delete(item.getOwnedByFolder(), item.getOriginalName())) {
-						logger.error("[[ERROR]] Error deleting S3 file {}", item.getOriginalName());
-					}
-				});
-			}
-		}
-	}
-*/
-/*
-  	public void uploadAsFolder(Path fullPath, String localRootFolder, String remoteFolder) {
-		String relativePath = fullPath.toString().replaceFirst(localRootFolder, "");
-		List<Item> toMatch = mongoOperations.find(
-				new Query(
-						Criteria.where("ownedByFolder").is(remoteFolder).and("originalName").regex("^" + relativePath)),
-				Item.class);
-		Map<String, Item> toMatchMap = toMatch.stream().collect(Collectors.toMap(Item::getOriginalName, Item::get));
-
-		try {
-			Files.walk(fullPath).forEach(path -> {
-				try {
-					long lastModified = 0L;
-					lastModified = Files.getLastModifiedTime(fullPath).toMillis();
-					File file = path.toFile();
-					if (!file.isDirectory() && file.canRead()
-							&& FileUtils.notMatchFilters(synchronizationService.getExclusionPattern(localRootFolder),
-									path.toString().replaceFirst(localRootFolder, ""))) {
-						if (toMatchMap.containsKey(path.toString())) {
-							if (toMatchMap.get(relativePath).getLastUpdate() > lastModified) {
-								logger.debug("[[DEBUG]] File {} in synchronizing folder is out to date. Updating...",
-										path.toString());
-								getOrUpdate(path.toString(), toMatchMap.get(relativePath));
-							} else {
-								logger.debug("[[DEBUG]] File {} in synchronizing must be uploaded", path.toString());
-								try {
-									upload(path, fullPath.toString().replaceFirst(localRootFolder, ""), remoteFolder, toMatchMap.get(relativePath),
-											lastModified);
-								} catch (PreventUploadForFolderException e) {
-									logger.error("[[ERROR]] Trying to upload folder {}, prevented by default",
-											path.toString());
-								}
-							}
-						} else {
-							logger.debug(
-									"[[DEBUG]] File {} in synchronizing folder not present in remote one, Uploading...",
-									path.toString());
-							upload(path, fullPath.toString().replaceFirst(localRootFolder, ""), remoteFolder, lastModified);
-						}
-					}
-				} catch (IOException e) {
-					logger.error("[[ERROR]] Exception reading last modified for file {}. Item will be not processed",
-							path, e);
-				}
-			});
-		} catch (IOException e) {
-			logger.error("Exception walking filesystem for local folder {}", fullPath.toString(), e);
-		}
-	}
-*/
 	
 	public void removeRemoteFolder(String remoteFolder) {
 		List<SharedData> data = mongoOperations.findAll(SharedData.class);
@@ -341,5 +238,4 @@ public class UploadService {
 		}
 
 	}
-
 }
