@@ -26,5 +26,4 @@ public class AwsSaasConfiguration {
 										GlobalPropertiesManager.getProperty("s3.access_secret"))
 				)).build();
 	}
-
 }

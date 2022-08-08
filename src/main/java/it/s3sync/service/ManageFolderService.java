@@ -36,9 +36,6 @@ public class ManageFolderService {
 	@Autowired
 	private SynchronizationService synchronizationService;
 
-	@Autowired
-	private UploadService uploadService;
-
 	private static final Logger logger = LoggerFactory.getLogger(ManageFolderService.class); 
 	
 	public AddFolderResponse addFolder(String localPath, String remotePath) {
@@ -98,7 +95,7 @@ public class ManageFolderService {
 
 	private void startListenerThread(String remoteFolder, String localRootFolder) {
 		logger.debug("[[DEBUG]] Starting listener on {} -> {}", localRootFolder, remoteFolder);
-		WatchListeners.startThread(uploadService, synchronizationService, remoteFolder, localRootFolder);
+		WatchListeners.startThread(remoteFolder, localRootFolder);
 	}
 
 	public ListSyncFoldersResponse listFolders(Integer page, Integer pageSize) {

@@ -8,7 +8,6 @@ import javax.annotation.PostConstruct;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -19,12 +18,6 @@ import it.s3sync.utils.UserSpecificPropertiesManager;
 
 @Service
 public class StartListenerService {
-
-	@Autowired
-	private UploadService uploadService;
-
-	@Autowired
-	private SynchronizationService synchronizationService;
 
 	private static final Logger logger = LoggerFactory.getLogger(StartListenerService.class);
 
@@ -44,8 +37,7 @@ public class StartListenerService {
 		for (SyncFolder folder : syncFolders) {
 			logger.debug("[[DEBUG]] Start thread for remote folder {} sync with local folder {}",
 					folder.getRemotePath(), folder.getLocalPath());
-			WatchListeners.startThread(uploadService, synchronizationService, folder.getRemotePath(),
-					folder.getLocalPath());
+			WatchListeners.startThread(folder.getRemotePath(), folder.getLocalPath());
 		}
 	}
 

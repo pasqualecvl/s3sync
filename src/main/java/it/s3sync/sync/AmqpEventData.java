@@ -1,17 +1,16 @@
-package it.s3sync.listener;
+package it.s3sync.sync;
 
-import java.io.Serializable;
-
-public class SynchronizationMessageDto implements Serializable {
-
-	private static final long serialVersionUID = 204252542632494654L;
-	
+public class AmqpEventData extends EventData {
 	private String source;
 	private String remoteFolder;
 	private String file;
 	private S3Action s3Action;
 	private Long time = System.currentTimeMillis();
 
+	public AmqpEventData() {
+		super(EventSource.AMQP);
+	}
+	
 	public String getRemoteFolder() {
 		return remoteFolder;
 	}
@@ -44,10 +43,6 @@ public class SynchronizationMessageDto implements Serializable {
 		this.time = time;
 	}
 
-	public enum S3Action {
-		CREATE, MODIFY, DELETE;
-	}
-
 	public String getSource() {
 		return source;
 	}
@@ -55,12 +50,4 @@ public class SynchronizationMessageDto implements Serializable {
 	public void setSource(String source) {
 		this.source = source;
 	}
-
-	@Override
-	public String toString() {
-		return "SynchronizationMessageDto [source=" + source + ", remoteFolder=" + remoteFolder + ", file=" + file
-				+ ", s3Action=" + s3Action + ", time=" + time + "]";
-	}
-	
-
 }

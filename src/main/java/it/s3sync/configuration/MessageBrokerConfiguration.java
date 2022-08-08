@@ -13,6 +13,8 @@ import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
 import org.springframework.amqp.rabbit.listener.adapter.MessageListenerAdapter;
+import org.springframework.amqp.support.converter.DefaultClassMapper;
+import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -64,14 +66,29 @@ public class MessageBrokerConfiguration {
 
 	@Bean
 	public MessageListenerAdapter messageListenerAdapter(AmqpSyncListener amqpSyncListener) {
-		return new MessageListenerAdapter(amqpSyncListener, "receiveSyncMessage");
+		MessageListenerAdapter listener = new MessageListenerAdapter(amqpSyncListener, "receiveSyncMessage");
+		listener.setMessageConverter(jackson2JsonMessageConverter());
+		return listener;
+
 	}
 
 	@Bean
 	public AmqpTemplate amqpTemplate() {
 		RabbitTemplate template = new RabbitTemplate(connectionFactory());
 		template.setExchange(GlobalPropertiesManager.getProperty("amqp.notification_topic"));
+		template.setMessageConverter(jackson2JsonMessageConverter());
 		return template;
 	}
+	
+	@Bean
+	public Jackson2JsonMessageConverter jackson2JsonMessageConverter() {
+		Jackson2JsonMessageConverter jackson2JsonMessageConverter = new Jackson2JsonMessageConverter();
+		jackson2JsonMessageConverter.setAlwaysConvertToInferredType(true);
+		DefaultClassMapper defaultClassMapper = new DefaultClassMapper();
+		defaultClassMapper.setTrustedPackages("it.s3sync.sync");
+		jackson2JsonMessageConverter.setClassMapper(defaultClassMapper);
+		return jackson2JsonMessageConverter;
+	}
+
 
 }
