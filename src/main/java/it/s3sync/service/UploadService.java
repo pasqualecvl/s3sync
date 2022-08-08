@@ -117,22 +117,9 @@ public class UploadService {
 	}
 
 	private S3Response uploadOrMultipart(String s3Key, Path path) {
-        long bytes;
-		try {
-			bytes = Files.size(path);
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-        if(bytes > multipatUploadStartSize) {
-    		CreateMultipartUploadRequest upload = CreateMultipartUploadRequest.builder().build();
-        	
-        } else {
-    		PutObjectRequest objectRequest = PutObjectRequest.builder()
-    				.bucket(GlobalPropertiesManager.getProperty("s3.bucket")).key(s3Key)
-    				.build();
-    		return s3Client.putObject(objectRequest, path);        	
-        }
+		PutObjectRequest objectRequest = PutObjectRequest.builder()
+				.bucket(GlobalPropertiesManager.getProperty("s3.bucket")).key(s3Key).build();
+		return s3Client.putObject(objectRequest, path);
 	}
 
 	public void upload(Path path, String remoteFolder, String relativePath, Long lastModified) {
